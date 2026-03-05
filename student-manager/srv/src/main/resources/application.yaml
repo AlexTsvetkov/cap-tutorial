@@ -1,7 +1,81 @@
+# =============================================
+# Common configuration (all profiles)
+# =============================================
+spring:
+  application:
+    name: student-manager
+
+cds:
+  odata-v4:
+    endpoint:
+      path: /odata/v4              # OData endpoint base path
+
+# Health check endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.sap.cds: INFO
+    com.tutorial: DEBUG
 
 ---
+# =============================================
+# LOCAL profile (default) — H2 in-memory database
+# =============================================
 spring:
-  config.activate.on-profile: default
-  sql.init.platform: h2
+  config:
+    activate:
+      on-profile: default
+  datasource:
+    url: jdbc:h2:mem:studentdb;DB_CLOSE_DELAY=-1;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always                  # Auto-run data.sql on startup
+  h2:
+    console:
+      enabled: true                 # H2 web console at /h2-console
+
 cds:
-  data-source.auto-config.enabled: false
+  datasource:
+    auto-config:
+      enabled: true
+  security:
+    mock:
+      enabled: true                 # Mock authentication for local dev
+      users:
+        admin:
+          password: admin
+          roles:
+            - authenticated-user
+            - admin
+        user:
+          password: user
+          roles:
+            - authenticated-user
+
+---
+# =============================================
+# CLOUD profile — SAP BTP Cloud Foundry
+# =============================================
+spring:
+  config:
+    activate:
+      on-profile: cloud
+
+cds:
+  datasource:
+    auto-config:
+      enabled: true                 # Auto-detect HANA from VCAP_SERVICES
+  security:
+    xsuaa:
+      enabled: true                 # Real OAuth2 via XSUAA
+
+logging:
+  level:
+    com.sap.cds: INFO
+    com.tutorial: INFO

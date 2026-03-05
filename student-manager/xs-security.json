@@ -1,0 +1,43 @@
+{
+    "xsappname": "student-manager",
+    "tenant-mode": "dedicated",
+    "description": "Student Manager OAuth2 Security",
+    "scopes": [
+        {
+            "name": "$XSAPPNAME.user",
+            "description": "Regular user access"
+        },
+        {
+            "name": "$XSAPPNAME.admin",
+            "description": "Administrator access"
+        }
+    ],
+    "role-templates": [
+        {
+            "name": "User",
+            "description": "Standard user",
+            "scope-references": ["$XSAPPNAME.user"]
+        },
+        {
+            "name": "Admin",
+            "description": "Administrator",
+            "scope-references": ["$XSAPPNAME.user", "$XSAPPNAME.admin"]
+        }
+    ],
+    "role-collections": [
+        {
+            "name": "StudentManager_User",
+            "description": "Student Manager Users",
+            "role-template-references": ["$XSAPPNAME.User"]
+        },
+        {
+            "name": "StudentManager_Admin",
+            "description": "Student Manager Admins",
+            "role-template-references": ["$XSAPPNAME.Admin"]
+        }
+    ],
+    "oauth2-configuration": {
+        "redirect-uris": ["https://*.cfapps.us10-001.hana.ondemand.com/**"],
+        "token-validity": 900
+    }
+}

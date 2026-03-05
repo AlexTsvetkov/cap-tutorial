@@ -1,0 +1,18 @@
+{
+    "welcomeFile": "/odata/v4/StudentService/$metadata",
+    "authenticationMethod": "route",
+    "routes": [
+        {
+            "source": "^/odata/(.*)$",
+            "target": "/odata/$1",
+            "destination": "student-manager-srv",
+            "authenticationType": "xsuaa"
+        },
+        {
+            "source": "^/actuator/(.*)$",
+            "target": "/actuator/$1",
+            "destination": "student-manager-srv",
+            "authenticationType": "none"
+        }
+    ]
+}

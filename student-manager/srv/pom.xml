@@ -43,6 +43,26 @@
 			<artifactId>h2</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+
+		<!-- HANA database support — connects to SAP HANA Cloud -->
+		<dependency>
+			<groupId>com.sap.cds</groupId>
+			<artifactId>cds-feature-hana</artifactId>
+		</dependency>
+
+		<!-- Cloud Foundry integration — reads VCAP_SERVICES, enables XSUAA -->
+		<dependency>
+			<groupId>com.sap.cds</groupId>
+			<artifactId>cds-starter-cloudfoundry</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- Spring Boot Actuator — health checks used by BTP -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
 	</dependencies>
 
 	<build>

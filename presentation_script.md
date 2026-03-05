@@ -10,7 +10,7 @@
 ## Table of Contents
 
 1. [Prerequisites & Tool Installation](#step-1--prerequisites--tool-installation)
-2. [Create Project Folder & Git Init](#step-2--create-project-folder--git-init)
+2. [Create GitHub Repository & Clone](#step-2--create-github-repository--clone)
 3. [Scaffold CAP Java Project with Maven](#step-3--scaffold-cap-java-project-with-maven)
 4. [Understand the Project Structure & pom.xml](#step-4--understand-the-project-structure--pomxml)
 5. [Define the Students Entity (CDS Model)](#step-5--define-the-students-entity-cds-model)
@@ -88,44 +88,95 @@ cf plugins | grep multiapps
 
 ---
 
-## Step 2 — Create Project Folder & Git Init
+## Step 2 — Create GitHub Repository & Clone
 
 ### 🎤 What to say
 
-> "Let's create a fresh project directory and initialize Git right away. Version control from day one is always a good practice."
+> "Let's start by creating a GitHub repository first, then clone it to have version control properly set up from the beginning. This is the recommended workflow for collaborative projects."
 
-### Commands
+### Step 2.1: Create GitHub Repository
+
+1. Go to [GitHub](https://github.com) and sign in
+2. Click **"New repository"** (or go to https://github.com/new)
+3. Configure the repository:
+   - **Repository name:** `cap-tutorial`
+   - **Description:** "CAP Java Tutorial - Student Manager Application"
+   - **Visibility:** Public (or Private)
+   - ✅ **Add a README file** (optional)
+   - ✅ **Add .gitignore:** Select "Maven" template
+   - **License:** Choose if needed (e.g., MIT)
+4. Click **"Create repository"**
+
+### Step 2.2: Clone the Repository
 
 ```bash
-# Create project folder
-mkdir cap-tutorial && cd cap-tutorial
+# Clone the repository (replace with your GitHub username)
+git clone git@github.com:YOUR_USERNAME/cap-tutorial.git
 
-# Initialize git repository
-git init
+# Or using HTTPS:
+# git clone https://github.com/YOUR_USERNAME/cap-tutorial.git
 
-# Create .gitignore
-cat > .gitignore << 'EOF'
-node_modules/
-target/
-*.jar
-*.mtar
-.DS_Store
-*.iml
-.idea/
-.vscode/
-srv/src/gen/
-db/src/gen/
-EOF
+# Move into the cloned folder
+cd cap-tutorial
 
 # Verify
 ls -la
 git status
+git remote -v
+```
+
+### Step 2.3: Update .gitignore for CAP Java
+
+The GitHub-generated `.gitignore` is for generic Maven projects. Let's update it for CAP Java:
+
+```bash
+cat > .gitignore << 'EOF'
+# Maven
+target/
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# Node.js
+node_modules/
+
+# CAP generated files
+srv/src/gen/
+db/src/gen/
+
+# MTA build artifacts
+*.mtar
+mta_archives/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+out/
+EOF
+
+# Commit the updated .gitignore
+git add .gitignore
+git commit -m "chore: update .gitignore for CAP Java project"
+git push
 ```
 
 **🔍 Explain:**
-- We create a dedicated folder for our CAP project
-- `git init` initializes version control
-- The `.gitignore` excludes build artifacts (`target/`, `*.jar`), generated files (`src/gen/`), IDE files, and `node_modules/`
+- Creating the repo on GitHub first ensures proper remote setup
+- Cloning gives us a clean working directory with Git already configured
+- The `.gitignore` excludes:
+  - **Maven build outputs:** `target/`, `*.jar`
+  - **Node modules:** `node_modules/`
+  - **CAP generated files:** `srv/src/gen/`, `db/src/gen/` (regenerated on every build)
+  - **MTA archives:** `*.mtar`, `mta_archives/`
+  - **IDE files:** `.idea/`, `.vscode/`
 
 ---
 
