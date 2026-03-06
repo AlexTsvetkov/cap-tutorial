@@ -162,24 +162,25 @@ Create `srv/src/main/java/com/tutorial/studentmanager/handlers/StudentServiceHan
 ```java
 package com.tutorial.studentmanager.handlers;
 
-import com.sap.cds.services.cds.CdsService;
+import cds.gen.studentservice.Students;
+import cds.gen.studentservice.Students_;
+import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.Before;
 import com.sap.cds.services.handler.annotations.ServiceName;
-import cds.gen.studentservice.Students;
 import org.springframework.stereotype.Component;
 
 @Component
 @ServiceName("StudentService")
 public class StudentServiceHandler implements EventHandler {
 
-    @Before(event = {CdsService.EVENT_CREATE, CdsService.EVENT_UPDATE}, entity = Students_.CDS_NAME)
+    @Before(event = {CqnService.EVENT_CREATE, CqnService.EVENT_UPDATE}, entity = Students_.CDS_NAME)
     public void validateEmail(Students student) {
         String email = student.getEmail();
         if (email != null && !email.contains("@")) {
             throw new com.sap.cds.services.ServiceException(
-                com.sap.cds.services.ErrorStatuses.BAD_REQUEST,
-                "Invalid email format: " + email + ". Email must contain '@' character."
+                    com.sap.cds.services.ErrorStatuses.BAD_REQUEST,
+                    "Invalid email format: " + email + ". Email must contain '@' character."
             );
         }
     }
@@ -203,6 +204,44 @@ VALUES
 ---
 
 ## Step 9 - Application Configuration
+
+**Before this step**, you may have a minimal `application.yaml` like this:
+
+```yaml
+spring:
+  config.activate.on-profile: default
+  sql.init.platform: h2
+cds:
+  data-source.auto-config.enabled: false
+```
+
+**Replace it** with the full configuration below. Here's what changes and why:
+
+### Key Changes Explained
+
+| Property | Before | After | Reason |
+|----------|--------|-------|--------|
+| `spring.application.name` | ❌ missing | ✅ `student-manager` | App identification in logs/monitoring |
+| `spring.profiles.active` | ❌ missing | ✅ `default` | Explicit profile activation |
+| `cds.datasource.auto-config.enabled` | `false` | `true` | Let CAP detect DB automatically |
+| `spring.datasource.*` | ❌ missing | ✅ H2 config | Actual database connection |
+| `spring.sql.init.mode` | platform only | `always` / `never` | Control script execution per profile |
+| `cds.security.xsuaa.enabled` | ❌ missing | ✅ `true` (cloud) | OAuth2 in production |
+| `management.endpoints` | ❌ missing | ✅ health,info | Cloud Foundry health checks |
+
+### Why These Changes?
+
+1. **Multi-Document YAML Structure** (`---` separators): Spring Boot supports multiple profiles in one file. Common settings go at the top; profile-specific settings activate with `spring.config.activate.on-profile`.
+
+2. **`cds.datasource.auto-config.enabled: true`**: CAP Java auto-configuration detects your database:
+   - Locally → detects H2 from Spring datasource properties
+   - In Cloud → detects HANA from `VCAP_SERVICES` environment variable
+
+3. **Proper H2 Configuration**: `sql.init.platform: h2` alone doesn't configure a database. You need explicit `datasource.url`, `h2.console.enabled`, and `sql.init.mode: always` for sample data.
+
+4. **Cloud Profile**: In production, HANA schema is managed by HDI deployer (not SQL scripts), hence `sql.init.mode: never`. XSUAA provides real OAuth2 authentication.
+
+---
 
 Create `srv/src/main/resources/application.yaml`:
 
