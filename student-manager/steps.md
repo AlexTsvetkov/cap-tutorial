@@ -118,6 +118,43 @@ service StudentService {
 
 ---
 
+## Step 6.1 - Generate Java Classes from CDS Models
+
+After defining the data model and service, you must generate the Java interfaces before writing handlers.
+
+```bash
+cd student-manager
+mvn clean compile
+```
+
+This command triggers the CDS Maven Plugin (`cds-maven-plugin`) which:
+1. Compiles CDS models (`db/schema.cds`, `srv/service.cds`)
+2. Generates Java interfaces in `srv/src/gen/java/cds/gen/`
+
+### Generated Files
+
+After running `mvn compile`, you'll find:
+
+**`srv/src/gen/java/cds/gen/studentservice/`**:
+- `Students.java` - Entity interface with getters/setters
+- `Students_.java` - Static metadata class with `CDS_NAME` constant
+- `StudentService_.java` - Service metadata
+
+**`srv/src/gen/java/cds/gen/tutorial/`**:
+- `Students.java` - Base entity from `db/schema.cds`
+
+These generated classes are required for:
+- Type-safe entity access in handlers
+- Event handler annotations (e.g., `@Before(entity = Students_.CDS_NAME)`)
+- Compile-time validation of entity names
+
+⚠️ **Important**: Always regenerate after modifying `.cds` files:
+```bash
+mvn clean compile
+```
+
+---
+
 ## Step 7 - Java Handler (Optional Email Validation)
 
 Create `srv/src/main/java/com/tutorial/studentmanager/handlers/StudentServiceHandler.java`:
