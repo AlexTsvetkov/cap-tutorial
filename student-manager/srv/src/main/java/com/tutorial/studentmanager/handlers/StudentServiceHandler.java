@@ -1,12 +1,13 @@
 package com.tutorial.studentmanager.handlers;
 
 import cds.gen.studentservice.Students;
+import cds.gen.studentservice.Students_;
 import com.sap.cds.services.ErrorStatuses;
 import com.sap.cds.services.ServiceException;
+import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.Before;
 import com.sap.cds.services.handler.annotations.ServiceName;
-import com.sap.cds.services.cds.CqnService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -24,7 +25,7 @@ public class StudentServiceHandler implements EventHandler {
      * Ensures email contains '@' character.
      * Returns HTTP 400 Bad Request if validation fails.
      */
-    @Before(event = CqnService.EVENT_CREATE, entity = "StudentService.Students")
+    @Before(event = CqnService.EVENT_CREATE, entity = Students_.CDS_NAME)
     public void validateStudentEmail(List<Students> students) {
         for (Students student : students) {
             String email = student.getEmail();
