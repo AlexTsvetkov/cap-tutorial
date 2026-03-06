@@ -657,19 +657,17 @@ This approach is simpler than writing custom Spring Security filter chains — C
 @Order(1)
 public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
     http
-        .securityMatcher("/actuator/**")           // Only applies to /actuator/* paths
+        .securityMatcher("/actuator/health", "/actuator/health/**", "/actuator/info")  // Only match health endpoints
         .authorizeHttpRequests(authorize -> authorize
-            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info")
-                .permitAll()                        // Health & info: no auth required
-            .anyRequest().authenticated()           // Other actuator endpoints: require auth
+            .anyRequest().permitAll()               // All matched paths: no auth required
         );
     return http.build();
 }
 ```
 
-**Why not just `permitAll()` for all actuator endpoints?**
+**Why only these specific endpoints?**
 
-Security best practice: only expose what's needed. Health and info are safe; other actuator endpoints (like `/actuator/env`, `/actuator/beans`) could leak sensitive information.
+Security best practice: only expose what's needed. Health and info are safe for unauthenticated access; other actuator endpoints (like `/actuator/env`, `/actuator/beans`) could leak sensitive information and remain protected by CAP's default security.
 
 ---
 
@@ -701,11 +699,10 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-            .securityMatcher("/actuator/**")
-            .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
-                .anyRequest().authenticated()
-            );
+                .securityMatcher("/actuator/health", "/actuator/health/**", "/actuator/info")
+                .authorizeHttpRequests(authorize -> authorize
+                        .anyRequest().permitAll()
+                );
         return http.build();
     }
 }

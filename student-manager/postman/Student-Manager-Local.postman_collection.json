@@ -1,0 +1,754 @@
+{
+  "info": {
+    "_postman_id": "student-manager-local-collection",
+    "name": "Student Manager API (Local)",
+    "description": "CAP Java Student Manager OData V4 API collection for **local development**.\n\nThis collection uses Basic Authentication with CAP Mock users.\n\n## Mock Users (from application.yaml)\n- **admin/admin** - Has roles: authenticated-user, admin\n- **user/user** - Has roles: authenticated-user\n\n## Setup\n1. Start the application: `cd srv && mvn spring-boot:run`\n2. Import the 'Local' environment\n3. Run requests - Basic Auth is pre-configured",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "username",
+        "value": "{{username}}",
+        "type": "string"
+      },
+      {
+        "key": "password",
+        "value": "{{password}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Service Metadata",
+      "item": [
+        {
+          "name": "Get Service Document",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService"]
+            },
+            "description": "Returns the OData service document listing all available entity sets."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Metadata ($metadata)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/$metadata",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "$metadata"]
+            },
+            "description": "Returns the OData EDMX metadata document describing the entity model."
+          },
+          "response": []
+        }
+      ],
+      "description": "OData service metadata and documentation endpoints."
+    },
+    {
+      "name": "Students CRUD",
+      "item": [
+        {
+          "name": "Get All Students",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has value array', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('value');",
+                  "    pm.expect(jsonData.value).to.be.an('array');",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.value && jsonData.value.length > 0) {",
+                  "        pm.environment.set('studentId', jsonData.value[0].ID);",
+                  "        console.log('First student ID saved: ' + jsonData.value[0].ID);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"]
+            },
+            "description": "Retrieve all students from the database.\n\n**Note:** First student ID is auto-saved to studentId variable for use in other requests."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Student by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has student data', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('ID');",
+                  "    pm.expect(jsonData).to.have.property('firstName');",
+                  "    pm.expect(jsonData).to.have.property('lastName');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students({{studentId}})",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students({{studentId}})"]
+            },
+            "description": "Retrieve a single student by their UUID."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has created student', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('ID');",
+                  "    pm.expect(jsonData.firstName).to.equal('David');",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('studentId', jsonData.ID);",
+                  "    console.log('Created student ID saved: ' + jsonData.ID);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"David\",\n  \"lastName\": \"Brown\",\n  \"email\": \"david.brown@example.com\",\n  \"dateOfBirth\": \"1998-07-15\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"]
+            },
+            "description": "Create a new student. The ID will be auto-generated (UUID).\n\n**Required fields:** firstName, lastName, email\n**Optional fields:** dateOfBirth, status (defaults to 'ACTIVE')\n\n**Validation:** Email must contain '@' character."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Student - Invalid Email (Test Validation)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function() {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error message mentions email', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(JSON.stringify(jsonData)).to.include('email');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Invalid\",\n  \"lastName\": \"Email\",\n  \"email\": \"invalid-email-without-at\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"]
+            },
+            "description": "**Test email validation handler.**\n\nThis request should fail with HTTP 400 Bad Request because the email doesn't contain '@'.\n\nThis tests the StudentServiceHandler.validateStudentEmail() method."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Student (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Status was updated', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.equal('INACTIVE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students({{studentId}})",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students({{studentId}})"]
+            },
+            "description": "Partially update a student. Only the provided fields will be updated."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Student (PUT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"David\",\n  \"lastName\": \"Brown-Updated\",\n  \"email\": \"david.updated@example.com\",\n  \"dateOfBirth\": \"1998-07-15\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students({{studentId}})",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students({{studentId}})"]
+            },
+            "description": "Fully replace a student record. All fields should be provided."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204 No Content', function() {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students({{studentId}})",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students({{studentId}})"]
+            },
+            "description": "Delete a student by ID. Returns 204 No Content on success."
+          },
+          "response": []
+        }
+      ],
+      "description": "Create, Read, Update, Delete operations for Students entity."
+    },
+    {
+      "name": "OData Queries",
+      "item": [
+        {
+          "name": "$select - Select Specific Fields",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$select=firstName,lastName,email",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$select",
+                  "value": "firstName,lastName,email"
+                }
+              ]
+            },
+            "description": "Return only specific fields to reduce payload size."
+          },
+          "response": []
+        },
+        {
+          "name": "$filter - Active Students",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$filter=status eq 'ACTIVE'",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "status eq 'ACTIVE'"
+                }
+              ]
+            },
+            "description": "Filter students by status = ACTIVE."
+          },
+          "response": []
+        },
+        {
+          "name": "$filter - Inactive Students",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$filter=status eq 'INACTIVE'",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "status eq 'INACTIVE'"
+                }
+              ]
+            },
+            "description": "Filter students by status = INACTIVE."
+          },
+          "response": []
+        },
+        {
+          "name": "$filter - By Last Name (contains)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$filter=contains(lastName,'son')",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "contains(lastName,'son')"
+                }
+              ]
+            },
+            "description": "Filter students whose last name contains 'son' (e.g., Johnson)."
+          },
+          "response": []
+        },
+        {
+          "name": "$filter - By First Name (startswith)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$filter=startswith(firstName,'A')",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "startswith(firstName,'A')"
+                }
+              ]
+            },
+            "description": "Filter students whose first name starts with 'A' (e.g., Alice)."
+          },
+          "response": []
+        },
+        {
+          "name": "$filter - Born After 2000",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$filter=dateOfBirth gt 2000-01-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "dateOfBirth gt 2000-01-01"
+                }
+              ]
+            },
+            "description": "Filter students born after January 1, 2000."
+          },
+          "response": []
+        },
+        {
+          "name": "$filter - Combined (AND)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$filter=status eq 'ACTIVE' and dateOfBirth gt 2000-01-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "status eq 'ACTIVE' and dateOfBirth gt 2000-01-01"
+                }
+              ]
+            },
+            "description": "Filter students who are ACTIVE AND born after 2000."
+          },
+          "response": []
+        },
+        {
+          "name": "$orderby - Sort by Last Name (ASC)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$orderby=lastName asc",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$orderby",
+                  "value": "lastName asc"
+                }
+              ]
+            },
+            "description": "Sort students alphabetically by last name (ascending)."
+          },
+          "response": []
+        },
+        {
+          "name": "$orderby - Sort by Created Date (DESC)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$orderby=createdAt desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$orderby",
+                  "value": "createdAt desc"
+                }
+              ]
+            },
+            "description": "Sort students by creation date, most recent first."
+          },
+          "response": []
+        },
+        {
+          "name": "$top - First 2 Students",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$top=2",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$top",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Get only the first 2 students."
+          },
+          "response": []
+        },
+        {
+          "name": "$skip - Skip First Student",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$skip=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$skip",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Skip the first student and return the rest."
+          },
+          "response": []
+        },
+        {
+          "name": "$top & $skip - Pagination (Page 2)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$top=2&$skip=2",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$top",
+                  "value": "2"
+                },
+                {
+                  "key": "$skip",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Paginate results: Page 2 with page size 2 (skip first 2, take next 2)."
+          },
+          "response": []
+        },
+        {
+          "name": "$count - Get Total Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students/$count",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students", "$count"]
+            },
+            "description": "Get the total number of students (returns integer)."
+          },
+          "response": []
+        },
+        {
+          "name": "$count=true - Include Count in Response",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$count=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$count",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Include @odata.count in the response."
+          },
+          "response": []
+        },
+        {
+          "name": "Combined Query - Active, Sorted, Limited",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students?$filter=status eq 'ACTIVE'&$select=firstName,lastName,email&$orderby=lastName asc&$top=10&$count=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "status eq 'ACTIVE'"
+                },
+                {
+                  "key": "$select",
+                  "value": "firstName,lastName,email"
+                },
+                {
+                  "key": "$orderby",
+                  "value": "lastName asc"
+                },
+                {
+                  "key": "$top",
+                  "value": "10"
+                },
+                {
+                  "key": "$count",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Combined query: Filter active students, select specific fields, sort by name, limit to 10 results, include count."
+          },
+          "response": []
+        }
+      ],
+      "description": "OData V4 query options examples: $filter, $select, $orderby, $top, $skip, $count."
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Health Endpoint",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Status is UP', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.equal('UP');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Spring Boot Actuator health check endpoint.\n\n**No authentication required** - configured in SecurityConfig.java."
+          },
+          "response": []
+        },
+        {
+          "name": "Info Endpoint",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/info",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "info"]
+            },
+            "description": "Spring Boot Actuator info endpoint.\n\n**No authentication required** - configured in SecurityConfig.java."
+          },
+          "response": []
+        }
+      ],
+      "description": "Application health and info endpoints (no auth required)."
+    },
+    {
+      "name": "Test Without Auth",
+      "item": [
+        {
+          "name": "Get Students (No Auth - Should Fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function() {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/odata/v4/StudentService/Students",
+              "host": ["{{baseUrl}}"],
+              "path": ["odata", "v4", "StudentService", "Students"]
+            },
+            "description": "**Test that authentication is required.**\n\nThis request should fail with HTTP 401 Unauthorized because no credentials are provided.\n\nThe StudentService requires 'authenticated-user' role (defined in service.cds)."
+          },
+          "response": []
+        }
+      ],
+      "description": "Requests to test authentication requirements."
+    }
+  ]
+}

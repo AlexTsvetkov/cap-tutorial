@@ -6,10 +6,24 @@ This directory contains Postman collection and environments for testing the Stud
 
 | File | Description |
 |------|-------------|
-| `Student-Manager-API.postman_collection.json` | API collection with all endpoints |
+| `Student-Manager-Local.postman_collection.json` | **Recommended for local** - Uses Basic Auth |
+| `Student-Manager-API.postman_collection.json` | Full collection (Cloud + Local, Bearer token) |
 | `Local.postman_environment.json` | Environment for local development |
 | `Cloud.postman_environment.json` | Environment for SAP BTP Cloud Foundry |
 | `update-cloud-env.sh` | Script to auto-update Cloud environment credentials |
+
+## Which Collection to Use?
+
+| Environment | Recommended Collection | Auth Type |
+|-------------|----------------------|-----------|
+| **Local Development** | `Student-Manager-Local.postman_collection.json` | Basic Auth (admin/admin) |
+| **Cloud (SAP BTP)** | `Student-Manager-API.postman_collection.json` | Bearer Token (OAuth2) |
+
+**Local collection features:**
+- Pre-configured Basic Auth at collection level
+- Test scripts for response validation
+- Email validation test request
+- Authentication requirement test
 
 ## Quick Start
 
@@ -24,7 +38,7 @@ This directory contains Postman collection and environments for testing the Stud
 
 ## Local Environment
 
-### Setup
+### Setup (Recommended - Using Local Collection)
 
 1. Start the local server:
    ```bash
@@ -33,18 +47,23 @@ This directory contains Postman collection and environments for testing the Stud
    ```
 
 2. In Postman:
+   - Import `Student-Manager-Local.postman_collection.json`
    - Select **"Local"** environment from the dropdown
-   - For each request, change **Authorization** tab to **Basic Auth**
-   - Use credentials: `admin` / `admin`
+   - **No additional auth setup needed** - Basic Auth is pre-configured!
 
-### Local Auth Note
+### Mock Users
 
-The collection uses Bearer token auth by default (for cloud). For local testing:
+| Username | Password | Roles |
+|----------|----------|-------|
+| `admin` | `admin` | authenticated-user, admin |
+| `user` | `user` | authenticated-user |
+
+### Alternative: Using Main Collection
+
+If using `Student-Manager-API.postman_collection.json` for local:
 - Go to **Authorization** tab in each request
 - Change type to **Basic Auth**
 - Set Username: `admin`, Password: `admin`
-
-Or use the health endpoints which don't require auth.
 
 ---
 

@@ -23,11 +23,10 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-            .securityMatcher("/actuator/**")
-            .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
-                .anyRequest().authenticated()
-            );
+                .securityMatcher("/actuator/health", "/actuator/health/**", "/actuator/info")
+                .authorizeHttpRequests(authorize -> authorize
+                        .anyRequest().permitAll()
+                );
         return http.build();
     }
 }
