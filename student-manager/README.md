@@ -51,7 +51,31 @@ student-manager/
 - **Java 21** (required for cloud deployment)
 - **Maven 3.8+**
 - **Node.js 18+** (for CDS build tools)
-- **CF CLI** (for cloud deployment)
+- **@sap/cds-dk** - CDS development kit
+- **MBT** - MTA Build Tool (for cloud deployment)
+- **CF CLI** with **multiapps plugin** (for cloud deployment)
+
+### Installing Prerequisites
+
+```bash
+# Install CDS Development Kit
+npm install -g @sap/cds-dk
+
+# Install MTA Build Tool
+npm install -g mbt
+
+# Install CF CLI (macOS)
+brew install cloudfoundry/tap/cf-cli@8
+
+# Install multiapps plugin for MTA deployment
+cf install-plugin multiapps
+
+# Verify installations
+cds version
+mbt --version
+cf version
+cf plugins | grep multiapps
+```
 
 ## Quick Start
 
@@ -177,7 +201,6 @@ cf create-service hana-cloud hana-free student-manager-hana -c hana-cloud-config
         "memory": 16,
         "systempassword": "YourSecurePassword123!",
         "edition": "cloud",
-        "vcpu": 1,
         "whitelistIPs": ["0.0.0.0/0"]
     }
 }
@@ -209,14 +232,21 @@ cf services
    ```
 
 2. **Build the MTA archive:**
+   
+   ⚠️ **IMPORTANT**: You must generate HANA artifacts before building the MTA archive!
+   
    ```bash
-   mvn clean package -DskipTests
-   mbt build
+   # Option A: Use npm script (recommended)
+   npm run build:mta
+   
+   # Option B: Manual commands
+   cds build --for hana    # Generate HANA table/view definitions
+   mbt build               # Build MTA archive (includes mvn package)
    ```
 
 3. **Deploy to Cloud Foundry:**
    ```bash
-   cf deploy mta_archives/student-manager_*.mtar
+   cf deploy mta_archives/student-manager_1.0.0.mtar
    ```
 
 4. **Check deployment status:**
@@ -344,6 +374,27 @@ mbt build
 cf deploy mta_archives/*.mtar
 ```
 
+#### Error: "Table TUTORIAL_STUDENTS not found" (500 Error)
+
+**Cause**: HANA database tables were not deployed. The `db/src/gen/` folder with compiled CDS artifacts is missing.
+
+**Error message:**
+```
+CdsDataException: Target 'StudentService.Students' does not exist as table or view
+```
+
+**Solution**: Run `cds build --for hana` before building the MTA archive:
+```bash
+# Generate HANA artifacts (creates db/src/gen/*.hdbtable, *.hdbview)
+cds build --for hana
+
+# Rebuild and redeploy
+npm run build:mta
+cf deploy mta_archives/student-manager_1.0.0.mtar
+```
+
+**Why this happens**: The `mvn clean package` command only generates Java artifacts (`cds build --for java`), not HANA artifacts. See the "Understanding CDS Build Tasks" section for details.
+
 #### Linking HDI Container to Existing HANA Cloud
 
 If you have an existing HANA Cloud instance (e.g., from another project), you can link the HDI container to it:
@@ -440,15 +491,75 @@ Health endpoints are accessible without authentication (required for BTP):
 
 ### Build
 
+#### Understanding CDS Build Tasks
+
+CAP separates build tasks for different deployment targets:
+
+| Command | Target | Output | Purpose |
+|---------|--------|--------|---------|
+| `cds build --for java` | Java service | `srv/src/main/resources/edmx/` | OData metadata, CSN for Java runtime |
+| `cds build --for hana` | HANA database | `db/src/gen/` | `.hdbtable`, `.hdbview` for HDI deployer |
+
+**Why `mvn clean package` doesn't generate HANA artifacts:**
+
+The CDS Maven plugin (`cds-maven-plugin`) only runs `cds build --for java` because:
+- Maven builds the **Java service module** (`srv/`)
+- HANA artifacts belong to the **database module** (`db/`), which is a Node.js-based HDI deployer
+- These are separate concerns with separate build pipelines
+
+```
+mvn clean package
+    └── cds-maven-plugin
+        └── cds build --for java     ✅ Runs automatically
+                                      ❌ Does NOT run --for hana
+```
+
+#### Build Commands
+
 ```bash
-# Full build
+# Full build for local development (Java only)
 mvn clean install
+
+# Build for cloud deployment (includes HANA artifacts)
+npm run build:all
+# Or manually:
+cds build --for hana && mvn clean package -DskipTests
+
+# Build MTA archive for deployment
+npm run build:mta
+# Or manually:
+cds build --for hana && mbt build
 
 # Build srv module only
 cd srv && mvn clean compile
 
-# Generate CDS artifacts
+# Generate CDS artifacts (Java only)
 cd srv && mvn cds:generate
+
+# Generate HANA artifacts only
+cds build --for hana
+```
+
+#### Cloud Deployment Build Workflow
+
+⚠️ **IMPORTANT**: Always run `cds build --for hana` before building the MTA archive!
+
+```bash
+# Complete build and deploy workflow
+npm run build:mta     # Builds HANA artifacts + MTA archive
+cf deploy mta_archives/student-manager_1.0.0.mtar
+```
+
+Or step by step:
+```bash
+# 1. Generate HANA database artifacts
+cds build --for hana
+
+# 2. Build MTA archive (includes mvn package)
+mbt build
+
+# 3. Deploy to Cloud Foundry
+cf deploy mta_archives/student-manager_1.0.0.mtar
 ```
 
 ### Testing

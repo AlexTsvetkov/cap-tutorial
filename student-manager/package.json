@@ -12,7 +12,12 @@
         "@sap/cds-dk": "^8"
     },
     "scripts": {
-        "build": "cds build --production"
+        "build": "cds build --production",
+        "build:hana": "cds build --for hana",
+        "build:java": "cds build --for java",
+        "build:all": "cds build --for hana && cd srv && mvn clean package -DskipTests",
+        "build:mta": "cds build --for hana && mbt build -t mta_archives/",
+        "deploy": "cf deploy mta_archives/student-manager_1.0.0.mtar"
     },
     "cds": {
         "requires": {

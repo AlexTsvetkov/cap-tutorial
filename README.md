@@ -115,7 +115,7 @@ curl -X POST http://localhost:8080/odata/v4/StudentService/Students \
 ## 📚 Documentation
 
 - **[steps.md](student-manager/steps.md)** - Step-by-step implementation guide
-- **[presentation_script.md](presentation_script.md)** - Full workshop script with explanations
+- **[presentation_script.md](student-manager/presentation_script.md)** - Full workshop script with explanations
 
 ## 🔧 Key Technologies
 
