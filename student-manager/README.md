@@ -259,6 +259,44 @@ Find the XSUAA credentials in the `VCAP_SERVICES` section.
 3. Wait for it to be in "Running" state
 4. Re-run deployment: `cf deploy mta_archives/*.mtar`
 
+#### Error: "HANA Database instance is stopped"
+
+**Cause**: HANA Cloud instance exists but is stopped (trial instances auto-stop after inactivity).
+
+**Solution - Start HANA Cloud Instance:**
+
+**Step 1: Subscribe to SAP HANA Cloud Tools**
+1. Go to BTP Cockpit → Your Subaccount → **Service Marketplace**
+2. Search for **"SAP HANA Cloud"**
+3. Click **Create** → Select plan: **"tools"**
+4. Wait for subscription to complete
+
+**Step 2: Assign Administrator Role**
+1. Go to **Security** → **Role Collections**
+2. Find **"SAP HANA Cloud Administrator"**
+3. Click to open, then **Edit**
+4. Add your user (email address) under **Users**
+5. **Save**
+
+**Step 3: Start HANA Instance**
+1. Go to **Instances and Subscriptions** → **Subscriptions** tab
+2. Find **"SAP HANA Cloud"** subscription
+3. Click **"Go to Application"** (opens HANA Cloud Dashboard)
+4. In the dashboard, find your HANA instance
+5. Click the **three dots (⋮)** menu → **Start**
+6. Wait 2-5 minutes for status to show "Running"
+
+**Step 4: Retry Deployment**
+```bash
+cf deploy -i <deployment-id> -a retry
+```
+Or redeploy:
+```bash
+cf deploy mta_archives/*.mtar
+```
+
+⚠️ **Note**: Trial HANA Cloud instances automatically stop after periods of inactivity. You'll need to restart them before each development session.
+
 #### Error: "Insufficient resources"
 
 **Cause**: Trial account resource limits reached.

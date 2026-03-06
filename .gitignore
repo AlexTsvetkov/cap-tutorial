@@ -18,3 +18,4 @@ db/src/gen/
 out/
 
 package-lock.json
+/student-manager/cf-creds.md
