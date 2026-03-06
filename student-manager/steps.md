@@ -215,67 +215,34 @@ cds:
   data-source.auto-config.enabled: false
 ```
 
-**Replace it** with the full configuration below. Here's what changes and why:
-
-### Key Changes Explained
-
-| Property | Before | After | Reason |
-|----------|--------|-------|--------|
-| `spring.application.name` | ❌ missing | ✅ `student-manager` | App identification in logs/monitoring |
-| `spring.profiles.active` | ❌ missing | ✅ `default` | Explicit profile activation |
-| `cds.datasource.auto-config.enabled` | `false` | `true` | Let CAP detect DB automatically |
-| `spring.datasource.*` | ❌ missing | ✅ H2 config | Actual database connection |
-| `spring.sql.init.mode` | platform only | `always` / `never` | Control script execution per profile |
-| `cds.security.xsuaa.enabled` | ❌ missing | ✅ `true` (cloud) | OAuth2 in production |
-| `management.endpoints` | ❌ missing | ✅ health,info | Cloud Foundry health checks |
-
-### Why These Changes?
-
-1. **Multi-Document YAML Structure** (`---` separators): Spring Boot supports multiple profiles in one file. Common settings go at the top; profile-specific settings activate with `spring.config.activate.on-profile`.
-
-2. **`cds.datasource.auto-config.enabled: true`**: CAP Java auto-configuration detects your database:
-   - Locally → detects H2 from Spring datasource properties
-   - In Cloud → detects HANA from `VCAP_SERVICES` environment variable
-
-3. **Proper H2 Configuration**: `sql.init.platform: h2` alone doesn't configure a database. You need explicit `datasource.url`, `h2.console.enabled`, and `sql.init.mode: always` for sample data.
-
-4. **Cloud Profile**: In production, HANA schema is managed by HDI deployer (not SQL scripts), hence `sql.init.mode: never`. XSUAA provides real OAuth2 authentication.
+**Replace it** with the full configuration below. The file uses **multi-document YAML** (`---` separators) to define settings for different environments in a single file.
 
 ---
 
-Create `srv/src/main/resources/application.yaml`:
+### Configuration Structure Overview
+
+The `application.yaml` is divided into three sections:
+
+| Section | Activates When | Purpose |
+|---------|----------------|---------|
+| **Common** (top) | Always | Shared settings for all profiles |
+| **default** profile | Local dev (`mvn spring-boot:run`) | H2 database, mock auth |
+| **cloud** profile | SAP BTP deployment | HANA auto-detection, XSUAA OAuth2 |
+
+---
+
+### Section 1: Common Configuration (All Profiles)
 
 ```yaml
 spring:
   application:
     name: student-manager
-  profiles:
-    active: default
-
-# Local development profile (default)
----
-spring:
-  config:
-    activate:
-      on-profile: default
-  datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-  sql:
-    init:
-      mode: always
-      data-locations: classpath:data.sql
 
 cds:
-  odata-v4.endpoint.path: /odata/v4
+  odata-v4:
+    endpoint:
+      path: /odata/v4
 
-# Enable all actuator endpoints for local
 management:
   endpoints:
     web:
@@ -283,17 +250,91 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
 
-# Cloud profile
+logging:
+  level:
+    com.sap.cds: INFO
+    com.tutorial: DEBUG
+```
+
+| Property | Purpose |
+|----------|---------|
+| `spring.application.name` | Identifies app in logs, monitoring, and Cloud Foundry |
+| `cds.odata-v4.endpoint.path` | Base path for OData services → `/odata/v4/StudentService` |
+| `management.endpoints.web.exposure.include` | Exposes `/actuator/health` and `/actuator/info` for health checks |
+| `management.endpoint.health.show-details` | Shows health details only to authenticated users |
+| `logging.level` | Sets log verbosity (DEBUG for our code, INFO for CAP SDK) |
+
+---
+
+### Section 2: LOCAL Profile (`default`)
+
+```yaml
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+  datasource:
+    url: jdbc:h2:mem:studentdb;DB_CLOSE_DELAY=-1;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-h2.sql
+      continue-on-error: false
+  h2:
+    console:
+      enabled: true
+
+cds:
+  datasource:
+    auto-config:
+      enabled: true
+  security:
+    mock:
+      enabled: true
+      users:
+        admin:
+          password: admin
+          roles:
+            - authenticated-user
+            - admin
+        user:
+          password: user
+          roles:
+            - authenticated-user
+```
+
+| Property | Purpose |
+|----------|---------|
+| `spring.config.activate.on-profile: default` | This section only activates for `default` profile |
+| `spring.datasource.url` | H2 in-memory database with case-insensitive identifiers (like HANA) |
+| `spring.sql.init.mode: always` | Runs SQL scripts (`schema-h2.sql`, `data.sql`) on every startup |
+| `spring.sql.init.schema-locations` | Explicit path to H2 schema file |
+| `spring.h2.console.enabled: true` | Enables web UI at `/h2-console` for debugging |
+| `cds.datasource.auto-config.enabled: true` | CAP auto-detects H2 from datasource config |
+| `cds.security.mock.enabled: true` | **CAP Mock Authentication** — creates test users without Spring Security config |
+| `cds.security.mock.users` | Defines `admin/admin` and `user/user` with roles for testing |
+
+#### Why Use CAP Mock Security?
+
+Instead of writing a custom `UserDetailsService` with Spring Security, CAP provides **built-in mock authentication**:
+- Simpler configuration (YAML only, no Java code for local users)
+- Automatically integrates with CAP's authorization checks
+- Uses Basic Auth — same as XSUAA in cloud (Bearer token from mock users)
+
+---
+
+### Section 3: CLOUD Profile
+
+```yaml
 ---
 spring:
   config:
     activate:
       on-profile: cloud
-  sql:
-    init:
-      mode: never
 
 cds:
   datasource:
@@ -303,6 +344,61 @@ cds:
     xsuaa:
       enabled: true
 
+logging:
+  level:
+    com.sap.cds: INFO
+    com.tutorial: INFO
+```
+
+| Property | Purpose |
+|----------|---------|
+| `spring.config.activate.on-profile: cloud` | This section only activates when `SPRING_PROFILES_ACTIVE=cloud` |
+| `cds.datasource.auto-config.enabled: true` | Auto-detects HANA from `VCAP_SERVICES` environment variable |
+| `cds.security.xsuaa.enabled: true` | Enables OAuth2 authentication via XSUAA service |
+| `logging.level: INFO` | Reduces log verbosity in production |
+
+#### How Cloud Profile Gets Activated
+
+The `mta.yaml` sets an environment variable on the Java app:
+```yaml
+properties:
+  SPRING_PROFILES_ACTIVE: cloud
+```
+
+This automatically switches to:
+- **HANA** database (from bound HDI container service)
+- **XSUAA** authentication (from bound XSUAA service)
+
+---
+
+### Key Differences: Local vs. Cloud
+
+| Aspect | Local (`default`) | Cloud (`cloud`) |
+|--------|-------------------|-----------------|
+| **Database** | H2 in-memory | SAP HANA Cloud |
+| **Schema** | `schema-h2.sql` (auto-run) | HDI deployer (separate module) |
+| **Sample Data** | `data.sql` (auto-run) | Must be inserted via API |
+| **Authentication** | CAP Mock (Basic Auth) | XSUAA OAuth2 (Bearer token) |
+| **Users** | `admin/admin`, `user/user` | BTP user assignments |
+
+---
+
+Create `srv/src/main/resources/application.yaml`:
+
+```yaml
+# =============================================
+# Common configuration (all profiles)
+# =============================================
+spring:
+  application:
+    name: student-manager
+
+cds:
+  odata-v4:
+    endpoint:
+      path: /odata/v4              # OData endpoint base path
+
+# Health check endpoints (unauthenticated for BTP health checks)
 management:
   endpoints:
     web:
@@ -310,14 +406,149 @@ management:
         include: health,info
   endpoint:
     health:
-      probes:
-        enabled: true
-      show-details: always
+      show-details: when-authorized
+
+logging:
+  level:
+    com.sap.cds: INFO
+    com.tutorial: DEBUG
+
+---
+# =============================================
+# LOCAL profile (default) — H2 in-memory database
+# =============================================
+spring:
+  config:
+    activate:
+      on-profile: default
+  datasource:
+    url: jdbc:h2:mem:studentdb;DB_CLOSE_DELAY=-1;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always                  # Auto-run schema and data SQL on startup
+      schema-locations: classpath:schema-h2.sql    # Explicit schema file for H2
+      continue-on-error: false      # Stop if SQL script fails
+  h2:
+    console:
+      enabled: true                 # H2 web console at /h2-console
+
+cds:
+  datasource:
+    auto-config:
+      enabled: true
+  security:
+    mock:
+      enabled: true                 # Mock authentication for local dev
+      users:
+        admin:
+          password: admin
+          roles:
+            - authenticated-user
+            - admin
+        user:
+          password: user
+          roles:
+            - authenticated-user
+
+---
+# =============================================
+# CLOUD profile — SAP BTP Cloud Foundry
+# =============================================
+spring:
+  config:
+    activate:
+      on-profile: cloud
+
+cds:
+  datasource:
+    auto-config:
+      enabled: true                 # Auto-detect HANA from VCAP_SERVICES
+  security:
+    xsuaa:
+      enabled: true                 # Real OAuth2 via XSUAA
+
+logging:
+  level:
+    com.sap.cds: INFO
+    com.tutorial: INFO
 ```
 
 ---
 
 ## Step 10 - Security Configuration
+
+This step creates a minimal `SecurityConfig` class to allow **unauthenticated access to health check endpoints**. This is required because Cloud Foundry performs health probes on `/actuator/health` before the app is fully started — if authentication is required, the health check fails and the app won't deploy.
+
+### Why Do We Need This?
+
+**Problem**: By default, Spring Security (included via CAP dependencies) blocks all requests, including health endpoints.
+
+**Solution**: Create a security filter chain with `@Order(1)` that permits actuator endpoints before CAP's default security kicks in.
+
+### What About OData Authentication?
+
+For OData endpoints (`/odata/v4/**`), we rely on **CAP's built-in security** configured in `application.yaml`:
+
+| Environment | Mechanism | Config |
+|-------------|-----------|--------|
+| **Local** | CAP Mock Authentication | `cds.security.mock.enabled: true` |
+| **Cloud** | XSUAA OAuth2 | `cds.security.xsuaa.enabled: true` |
+
+This approach is simpler than writing custom Spring Security filter chains — CAP handles authentication automatically based on the active profile.
+
+### Security Filter Chain Explained
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Incoming Request                         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  @Order(1) actuatorSecurityFilterChain                      │
+│  Matches: /actuator/**                                      │
+│  Action: permitAll() for health, info; authenticated others │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ (if not /actuator/**)
+┌─────────────────────────────────────────────────────────────┐
+│  CAP Default Security (auto-configured)                     │
+│  Local: Mock users from application.yaml                    │
+│  Cloud: XSUAA OAuth2 token validation                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Annotations
+
+| Annotation | Purpose |
+|------------|---------|
+| `@Configuration` | Marks this class as a Spring configuration |
+| `@EnableWebSecurity` | Activates Spring Security's web security support |
+| `@Order(1)` | Ensures this filter runs **before** CAP's default security |
+
+### Code Breakdown
+
+```java
+@Bean
+@Order(1)
+public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .securityMatcher("/actuator/**")           // Only applies to /actuator/* paths
+        .authorizeHttpRequests(authorize -> authorize
+            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info")
+                .permitAll()                        // Health & info: no auth required
+            .anyRequest().authenticated()           // Other actuator endpoints: require auth
+        );
+    return http.build();
+}
+```
+
+**Why not just `permitAll()` for all actuator endpoints?**
+
+Security best practice: only expose what's needed. Health and info are safe; other actuator endpoints (like `/actuator/env`, `/actuator/beans`) could leak sensitive information.
+
+---
 
 Create `srv/src/main/java/com/tutorial/studentmanager/config/SecurityConfig.java`:
 
@@ -326,60 +557,33 @@ package com.tutorial.studentmanager.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Security configuration to allow unauthenticated access to health endpoints.
+ * This is required for SAP BTP Cloud Foundry health checks.
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
+    /**
+     * Security filter chain for actuator endpoints.
+     * Order 1 ensures this is evaluated before the default CAP security configuration.
+     */
     @Bean
     @Order(1)
     public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .securityMatcher("/actuator/**")
             .authorizeHttpRequests(authorize -> authorize
-                .anyRequest().permitAll()
+                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                .anyRequest().authenticated()
             );
         return http.build();
-    }
-
-    @Bean
-    @Order(2)
-    @Profile("default")
-    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/h2-console/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
-            .httpBasic(basic -> {});
-        return http.build();
-    }
-
-    @Bean
-    @Profile("default")
-    public UserDetailsService users() {
-        return new InMemoryUserDetailsManager(
-            User.withDefaultPasswordEncoder()
-                .username("admin")
-                .password("admin")
-                .roles("ADMIN", "USER")
-                .build(),
-            User.withDefaultPasswordEncoder()
-                .username("user")
-                .password("user")
-                .roles("USER")
-                .build()
-        );
     }
 }
 ```
