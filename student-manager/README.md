@@ -48,7 +48,7 @@ student-manager/
 
 ## Prerequisites
 
-- **Java 17+** (or Java 21)
+- **Java 21** (required for cloud deployment)
 - **Maven 3.8+**
 - **Node.js 18+** (for CDS build tools)
 - **CF CLI** (for cloud deployment)
@@ -306,6 +306,56 @@ cf deploy mta_archives/*.mtar
 2. Delete unused services: `cf services` then `cf delete-service <service-name>`
 3. Reduce memory in mta.yaml if needed
 
+#### Error: "UnsupportedClassVersionError" (Java version mismatch)
+
+**Cause**: Application compiled with Java 21 but runtime using Java 17.
+
+**Error message:**
+```
+UnsupportedClassVersionError: com/tutorial/studentmanager/Application has been compiled by 
+a more recent version of the Java Runtime (class file version 65.0), this version of the 
+Java Runtime only recognizes class file versions up to 61.0
+```
+
+**Solution**: Ensure `mta.yaml` specifies Java 21:
+```yaml
+properties:
+  JBP_CONFIG_SAP_MACHINE_JRE: '{ version: 21.+ }'
+```
+
+#### Error: "requires a peer of '@sap/hana-client' or 'hdb'"
+
+**Cause**: HDI deployer missing database client dependency.
+
+**Solution**: Add `hdb` to `db/package.json`:
+```json
+{
+  "dependencies": {
+    "@sap/hdi-deploy": "^5",
+    "hdb": "^0.19.0"
+  }
+}
+```
+
+Then rebuild and redeploy:
+```bash
+cd db && npm install && cd ..
+mbt build
+cf deploy mta_archives/*.mtar
+```
+
+#### Linking HDI Container to Existing HANA Cloud
+
+If you have an existing HANA Cloud instance (e.g., from another project), you can link the HDI container to it:
+
+```bash
+# Get the HANA Cloud instance GUID
+cf service <your-hana-instance> --guid
+
+# Create HDI container linked to existing HANA
+cf create-service hana hdi-shared student-manager-db -c '{"database_id":"<guid>"}'
+```
+
 ## Postman Collection
 
 A complete Postman collection is available in the `postman/` directory:
@@ -379,7 +429,7 @@ Health endpoints are accessible without authentication (required for BTP):
 
 ## Technology Stack
 
-- **Backend:** Java 17+, Spring Boot 3.x
+- **Backend:** Java 21, Spring Boot 3.x
 - **Framework:** SAP CAP Java 4.x
 - **Database:** H2 (local), SAP HANA Cloud (production)
 - **Security:** Spring Security, SAP XSUAA
