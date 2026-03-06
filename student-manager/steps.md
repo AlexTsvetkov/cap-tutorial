@@ -599,77 +599,39 @@ logging:
 
 ---
 
-## Step 10 - Security Configuration
+## Step 10 - Add Security Dependencies
 
-This step creates a minimal `SecurityConfig` class to allow **unauthenticated access to health check endpoints**. This is required because Cloud Foundry performs health probes on `/actuator/health` before the app is fully started — if authentication is required, the health check fails and the app won't deploy.
+Add these dependencies to `srv/pom.xml`:
 
-### Why Do We Need This?
+```xml
+<!-- Spring Security — required for custom security configuration -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-security</artifactId>
+</dependency>
 
-**Problem**: By default, Spring Security (included via CAP dependencies) blocks all requests, including health endpoints.
-
-**Solution**: Create a security filter chain with `@Order(1)` that permits actuator endpoints before CAP's default security kicks in.
-
-### What About OData Authentication?
-
-For OData endpoints (`/odata/v4/**`), we rely on **CAP's built-in security** configured in `application.yaml`:
-
-| Environment | Mechanism | Config |
-|-------------|-----------|--------|
-| **Local** | CAP Mock Authentication | `cds.security.mock.enabled: true` |
-| **Cloud** | XSUAA OAuth2 | `cds.security.xsuaa.enabled: true` |
-
-This approach is simpler than writing custom Spring Security filter chains — CAP handles authentication automatically based on the active profile.
-
-### Security Filter Chain Explained
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Incoming Request                         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  @Order(1) actuatorSecurityFilterChain                      │
-│  Matches: /actuator/**                                      │
-│  Action: permitAll() for health, info; authenticated others │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ (if not /actuator/**)
-┌─────────────────────────────────────────────────────────────┐
-│  CAP Default Security (auto-configured)                     │
-│  Local: Mock users from application.yaml                    │
-│  Cloud: XSUAA OAuth2 token validation                       │
-└─────────────────────────────────────────────────────────────┘
+<!-- Spring Boot Actuator — health checks used by BTP -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
 ```
 
-### Key Annotations
-
-| Annotation | Purpose |
+| Dependency | Purpose |
 |------------|---------|
-| `@Configuration` | Marks this class as a Spring configuration |
-| `@EnableWebSecurity` | Activates Spring Security's web security support |
-| `@Order(1)` | Ensures this filter runs **before** CAP's default security |
-
-### Code Breakdown
-
-```java
-@Bean
-@Order(1)
-public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
-    http
-        .securityMatcher("/actuator/health", "/actuator/health/**", "/actuator/info")  // Only match health endpoints
-        .authorizeHttpRequests(authorize -> authorize
-            .anyRequest().permitAll()               // All matched paths: no auth required
-        );
-    return http.build();
-}
-```
-
-**Why only these specific endpoints?**
-
-Security best practice: only expose what's needed. Health and info are safe for unauthenticated access; other actuator endpoints (like `/actuator/env`, `/actuator/beans`) could leak sensitive information and remain protected by CAP's default security.
+| `spring-boot-starter-security` | Enables `@EnableWebSecurity` and custom `SecurityFilterChain` beans |
+| `spring-boot-starter-actuator` | Provides `/actuator/health` endpoint for BTP health probes |
 
 ---
+
+## Step 10.1 - Security Configuration
+
+Create a `SecurityConfig` class to allow **unauthenticated access to health endpoints**. BTP Cloud Foundry probes `/actuator/health` before the app starts — without this config, health checks fail.
+
+| Environment | OData Authentication | Config |
+|-------------|---------------------|--------|
+| **Local** | CAP Mock Auth | `cds.security.mock.enabled: true` |
+| **Cloud** | XSUAA OAuth2 | `cds.security.xsuaa.enabled: true` |
 
 Create `srv/src/main/java/com/tutorial/studentmanager/config/SecurityConfig.java`:
 
