@@ -10,12 +10,15 @@ cds:
     endpoint:
       path: /odata/v4              # OData endpoint base path
 
-# Health check endpoints
+# Health check endpoints (unauthenticated for BTP health checks)
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
 
 logging:
   level:
@@ -35,7 +38,9 @@ spring:
     driver-class-name: org.h2.Driver
   sql:
     init:
-      mode: always                  # Auto-run data.sql on startup
+      mode: always                  # Auto-run schema and data SQL on startup
+      schema-locations: classpath:schema-h2.sql    # Explicit schema file for H2
+      continue-on-error: false      # Stop if SQL script fails
   h2:
     console:
       enabled: true                 # H2 web console at /h2-console

@@ -1,5 +1,8 @@
 package com.tutorial.studentmanager.handlers;
 
+import cds.gen.studentservice.Students;
+import com.sap.cds.services.ErrorStatuses;
+import com.sap.cds.services.ServiceException;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.Before;
 import com.sap.cds.services.handler.annotations.ServiceName;
@@ -9,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 @Component
 @ServiceName("StudentService")
@@ -20,15 +22,16 @@ public class StudentServiceHandler implements EventHandler {
     /**
      * Validation: runs BEFORE every CREATE operation on Students.
      * Ensures email contains '@' character.
+     * Returns HTTP 400 Bad Request if validation fails.
      */
     @Before(event = CqnService.EVENT_CREATE, entity = "StudentService.Students")
-    public void validateStudentEmail(List<Map<String, Object>> students) {
-        for (Map<String, Object> student : students) {
-            String email = (String) student.get("email");
+    public void validateStudentEmail(List<Students> students) {
+        for (Students student : students) {
+            String email = student.getEmail();
             if (email != null && !email.contains("@")) {
-                throw new IllegalArgumentException("Invalid email: " + email);
+                throw new ServiceException(ErrorStatuses.BAD_REQUEST, "Invalid email format: " + email + ". Email must contain '@' character.");
             }
-            log.info("Creating student: {} {}", student.get("firstName"), student.get("lastName"));
+            log.info("Creating student: {} {}", student.getFirstName(), student.getLastName());
         }
     }
 }
