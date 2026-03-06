@@ -1,0 +1,8 @@
+{
+    "data": {
+        "memory": 16,
+        "systempassword": "HanaCloud2026!",
+        "edition": "cloud",
+        "whitelistIPs": ["0.0.0.0/0"]
+    }
+}

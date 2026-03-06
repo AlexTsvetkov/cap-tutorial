@@ -75,11 +75,17 @@ modules:
 resources:
 
   # HANA HDI Container (database)
+  # IMPORTANT: Requires SAP HANA Cloud instance to be created first in BTP Cockpit!
+  # For Trial: Go to BTP Cockpit -> Subaccount -> SAP HANA Cloud -> Create Instance
   - name: student-manager-db
     type: com.sap.xs.hdi-container
     parameters:
       service: hana
       service-plan: hdi-shared
+      config:
+        # Use default HANA Cloud instance in the space
+        # If you have multiple instances, specify: database_id: <your-hana-db-id>
+        schema: STUDENT_MANAGER
 
   # XSUAA (OAuth2 authentication)
   - name: student-manager-xsuaa

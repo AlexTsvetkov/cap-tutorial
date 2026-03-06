@@ -9,6 +9,7 @@ This folder contains a Postman collection and environments for testing the Stude
 | `Student-Manager-API.postman_collection.json` | Main API collection with all requests |
 | `Local.postman_environment.json` | Environment for local development |
 | `Cloud.postman_environment.json` | Environment for SAP BTP Cloud Foundry |
+| `update-cloud-env.sh` | Script to auto-configure Cloud environment from BTP |
 
 ## Import into Postman
 
@@ -119,11 +120,41 @@ Student Manager API
 
 1. Select **"Student Manager - Cloud (BTP)"** environment
 
-2. Configure environment variables (see setup above)
+2. Configure environment variables (see setup above) **OR use the auto-configure script:**
+
+   ```bash
+   # Auto-configure from BTP (requires jq)
+   cd postman
+   ./update-cloud-env.sh student-manager-srv
+   ```
 
 3. Run **"Get OAuth2 Token (Client Credentials)"** request
 
 4. Token is auto-saved - now run other requests
+
+### Auto-Configure Cloud Environment
+
+The `update-cloud-env.sh` script automatically extracts XSUAA credentials from Cloud Foundry and updates the Cloud environment file.
+
+**Requirements:**
+- CF CLI installed and logged in (`cf login`)
+- `jq` installed (`brew install jq`)
+- Application deployed to Cloud Foundry
+
+**Usage:**
+```bash
+# Default app name (student-manager-srv)
+./update-cloud-env.sh
+
+# Custom app name
+./update-cloud-env.sh my-app-srv
+```
+
+**What it does:**
+1. Gets the application URL from `cf app`
+2. Extracts XSUAA credentials (url, clientid, clientsecret) from VCAP_SERVICES
+3. Updates `Cloud.postman_environment.json` with the extracted values
+4. Displays next steps for testing
 
 ## Sample Data
 
