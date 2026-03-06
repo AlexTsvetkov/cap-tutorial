@@ -1,261 +1,202 @@
-# Student Manager API - Postman Collection
+# Postman Collection for Student Manager API
 
-This folder contains a Postman collection and environments for testing the Student Manager CAP Java OData V4 API.
+This directory contains Postman collection and environments for testing the Student Manager OData V4 API.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `Student-Manager-API.postman_collection.json` | Main API collection with all requests |
+| `Student-Manager-API.postman_collection.json` | API collection with all endpoints |
 | `Local.postman_environment.json` | Environment for local development |
 | `Cloud.postman_environment.json` | Environment for SAP BTP Cloud Foundry |
-| `update-cloud-env.sh` | Script to auto-configure Cloud environment from BTP |
+| `update-cloud-env.sh` | Script to auto-update Cloud environment credentials |
 
-## Import into Postman
+## Quick Start
+
+### Import into Postman
 
 1. Open Postman
 2. Click **Import** button
-3. Drag all JSON files or select them
-4. Both collection and environments will be imported
+3. Select all files from this directory
+4. The collection and environments will be imported
 
-## Environments
+---
+
+## Local Environment
+
+### Setup
+
+1. Start the local server:
+   ```bash
+   cd srv
+   mvn spring-boot:run
+   ```
+
+2. In Postman:
+   - Select **"Local"** environment from the dropdown
+   - For each request, change **Authorization** tab to **Basic Auth**
+   - Use credentials: `admin` / `admin`
+
+### Local Auth Note
+
+The collection uses Bearer token auth by default (for cloud). For local testing:
+- Go to **Authorization** tab in each request
+- Change type to **Basic Auth**
+- Set Username: `admin`, Password: `admin`
+
+Or use the health endpoints which don't require auth.
+
+---
+
+## Cloud Environment (SAP BTP)
+
+### Setup
+
+The Cloud environment is pre-configured with:
+- `baseUrl` - Cloud app URL
+- `xsuaaUrl` - OAuth token endpoint
+- `clientId` - XSUAA client ID
+- `clientSecret` - XSUAA client secret
+
+### Usage
+
+1. Select **"Cloud"** environment from the dropdown
+
+2. **Get OAuth Token FIRST:**
+   - Go to **Authentication (Cloud)** folder
+   - Run **"Get OAuth2 Token (Client Credentials)"** request
+   - Token is automatically saved to `accessToken` variable
+
+3. **Make API Requests:**
+   - All requests will use the Bearer token automatically
+   - Token expires after ~12 hours, re-run token request if needed
+
+### Workflow
+
+```
+1. Select Cloud environment
+2. Run "Get OAuth2 Token (Client Credentials)" 
+3. Token saved to accessToken ✓
+4. Run any API request (uses Bearer token automatically)
+```
+
+---
+
+## Updating Cloud Credentials
+
+If the app is redeployed, you may need to update credentials:
+
+### Option 1: Use the Script
+
+```bash
+cd postman
+./update-cloud-env.sh student-manager-srv
+```
+
+This script:
+- Extracts XSUAA credentials from Cloud Foundry
+- Updates `Cloud.postman_environment.json`
+
+### Option 2: Manual Update
+
+1. Get credentials:
+   ```bash
+   cf env student-manager-srv | grep -A 20 '"xsuaa"'
+   ```
+
+2. Update these values in `Cloud.postman_environment.json`:
+   - `clientId` → `clientid` from output
+   - `clientSecret` → `clientsecret` from output
+   - `xsuaaUrl` → `url` from output
+   - `baseUrl` → App URL from `cf app student-manager-srv`
+
+---
+
+## Collection Structure
+
+### 1. Authentication (Cloud)
+- **Get OAuth2 Token (Client Credentials)** - Get access token ⭐ Run first!
+- **Get OAuth2 Token (Password Grant)** - Alternative with user credentials
+
+### 2. Service Metadata
+- Get Service Document
+- Get Metadata ($metadata)
+
+### 3. Students CRUD
+- Get All Students
+- Get Student by ID
+- Create Student
+- Update Student (PATCH)
+- Update Student (PUT)
+- Delete Student
+
+### 4. OData Queries
+- $select - Select Specific Fields
+- $filter - Various filter examples
+- $orderby - Sorting
+- $top & $skip - Pagination
+- $count - Counting
+
+### 5. Health Check
+- Health Endpoint (no auth)
+- Info Endpoint (no auth)
+
+---
+
+## Environment Variables
 
 ### Local Environment
-
-Pre-configured for local development with H2 in-memory database.
 
 | Variable | Value | Description |
 |----------|-------|-------------|
 | `baseUrl` | `http://localhost:8080` | Local server URL |
-| `username` | `admin` | Mock user (admin or user) |
-| `password` | `admin` | Mock password |
-| `studentId` | `11111111-...` | Sample student ID for testing |
+| `username` | `admin` | Basic auth username |
+| `password` | `admin` | Basic auth password |
+| `studentId` | (auto-set) | Current student ID for requests |
+| `accessToken` | (unused) | Not used for local |
 
-**Authentication:** Basic Auth (automatic)
-
-### Cloud Environment (BTP)
-
-For SAP BTP Cloud Foundry deployment with XSUAA authentication.
+### Cloud Environment
 
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `baseUrl` | `https://your-app...` | Cloud Foundry app URL |
-| `xsuaaUrl` | `https://...authentication...` | XSUAA OAuth2 endpoint |
-| `clientId` | `sb-student-manager!tXXXX` | XSUAA client ID |
+| `baseUrl` | `https://...cfapps...` | Cloud app URL |
+| `xsuaaUrl` | `https://...authentication...` | OAuth token URL |
+| `clientId` | `sb-student-manager!...` | XSUAA client ID |
 | `clientSecret` | (secret) | XSUAA client secret |
-| `accessToken` | (auto-filled) | OAuth2 access token |
+| `accessToken` | (auto-set) | OAuth access token |
+| `studentId` | (auto-set) | Current student ID |
 
-**Setup Cloud Environment:**
-
-1. Deploy the app to Cloud Foundry:
-   ```bash
-   cf push
-   ```
-
-2. Get XSUAA credentials:
-   ```bash
-   cf env student-manager-srv
-   ```
-
-3. Find the XSUAA section in the output and copy:
-   - `url` → `xsuaaUrl`
-   - `clientid` → `clientId`
-   - `clientsecret` → `clientSecret`
-
-4. Get the app URL:
-   ```bash
-   cf app student-manager-srv
-   ```
-   Copy the route URL → `baseUrl`
-
-5. Run "Get OAuth2 Token" request to authenticate
-
-## Collection Structure
-
-```
-Student Manager API
-├── Service Metadata
-│   ├── Get Service Document
-│   └── Get Metadata ($metadata)
-├── Students CRUD
-│   ├── Get All Students
-│   ├── Get Student by ID
-│   ├── Create Student
-│   ├── Update Student (PATCH)
-│   ├── Update Student (PUT)
-│   └── Delete Student
-├── OData Queries
-│   ├── $select - Select Specific Fields
-│   ├── $filter - Active Students
-│   ├── $filter - By Last Name (contains)
-│   ├── $filter - Born After Date
-│   ├── $orderby - Sort by Last Name
-│   ├── $orderby - Sort by Created Date (desc)
-│   ├── $top & $skip - Pagination
-│   ├── $count - Get Total Count
-│   ├── $count=true - Include Count in Response
-│   └── Combined Query
-├── Authentication (Cloud)
-│   ├── Get OAuth2 Token (Client Credentials)
-│   └── Get OAuth2 Token (Password Grant)
-└── Health Check
-    ├── Health Endpoint
-    └── Info Endpoint
-```
-
-## Quick Start
-
-### Local Testing
-
-1. Start the application locally:
-   ```bash
-   cd srv && mvn spring-boot:run
-   ```
-
-2. Select **"Student Manager - Local"** environment in Postman
-
-3. Run any request - Basic Auth is pre-configured
-
-### Cloud Testing
-
-1. Select **"Student Manager - Cloud (BTP)"** environment
-
-2. Configure environment variables (see setup above) **OR use the auto-configure script:**
-
-   ```bash
-   # Auto-configure from BTP (requires jq)
-   cd postman
-   ./update-cloud-env.sh student-manager-srv
-   ```
-
-3. Run **"Get OAuth2 Token (Client Credentials)"** request
-
-4. Token is auto-saved - now run other requests
-
-### Auto-Configure Cloud Environment
-
-The `update-cloud-env.sh` script automatically extracts XSUAA credentials from Cloud Foundry and updates the Cloud environment file.
-
-**Requirements:**
-- CF CLI installed and logged in (`cf login`)
-- `jq` installed (`brew install jq`)
-- Application deployed to Cloud Foundry
-
-**Usage:**
-```bash
-# Default app name (student-manager-srv)
-./update-cloud-env.sh
-
-# Custom app name
-./update-cloud-env.sh my-app-srv
-```
-
-**What it does:**
-1. Gets the application URL from `cf app`
-2. Extracts XSUAA credentials (url, clientid, clientsecret) from VCAP_SERVICES
-3. Updates `Cloud.postman_environment.json` with the extracted values
-4. Displays next steps for testing
-
-## Sample Data
-
-The application is seeded with sample students:
-
-| ID | Name | Email | Status |
-|----|------|-------|--------|
-| `11111111-1111-1111-1111-111111111111` | Alice Johnson | alice@example.com | ACTIVE |
-| `22222222-2222-2222-2222-222222222222` | Bob Smith | bob@example.com | ACTIVE |
-| `33333333-3333-3333-3333-333333333333` | Carol Williams | carol@example.com | INACTIVE |
-
-## OData Query Examples
-
-```
-# Filter active students
-GET /odata/v4/StudentService/Students?$filter=status eq 'ACTIVE'
-
-# Select specific fields
-GET /odata/v4/StudentService/Students?$select=firstName,lastName,email
-
-# Sort by last name
-GET /odata/v4/StudentService/Students?$orderby=lastName asc
-
-# Pagination (page 2, 10 per page)
-GET /odata/v4/StudentService/Students?$top=10&$skip=10
-
-# Combined query
-GET /odata/v4/StudentService/Students?$filter=status eq 'ACTIVE'&$select=firstName,lastName&$orderby=lastName&$top=5
-```
-
-## Validation
-
-The API validates input data and returns appropriate error responses.
-
-### Email Validation
-
-When creating a student, the email field must contain an `@` character. Invalid emails return HTTP 400:
-
-**Request:**
-```json
-POST /odata/v4/StudentService/Students
-{
-  "firstName": "Test",
-  "lastName": "User",
-  "email": "invalid-email"
-}
-```
-
-**Response (400 Bad Request):**
-```json
-{
-  "error": {
-    "code": "400",
-    "message": "Invalid email format: invalid-email. Email must contain '@' character."
-  }
-}
-```
+---
 
 ## Troubleshooting
 
-### 400 Bad Request
+### "401 Unauthorized" on Cloud
 
-- Check the request body for validation errors
-- Email must contain `@` character
-- Review the error message for specific field issues
+1. Token expired - re-run "Get OAuth2 Token" request
+2. Check `accessToken` is set in environment
+3. Verify environment is set to "Cloud"
 
-### 401 Unauthorized (Local)
+### "Token endpoint returns error"
 
-- Check username/password in environment (admin/admin or user/user)
-- Ensure Basic Auth is enabled on the request
+1. Verify XSUAA credentials are correct
+2. Check HANA Cloud is running
+3. Re-run `./update-cloud-env.sh` to refresh credentials
 
-### 401 Unauthorized (Cloud)
+### "Connection refused" on Local
 
-- Run "Get OAuth2 Token" request first
-- Check that `accessToken` variable is set
-- Verify XSUAA credentials are correct
+1. Ensure local server is running: `mvn spring-boot:run`
+2. Check port 8080 is not in use
+3. Verify environment is set to "Local"
 
-### 403 Forbidden
+### Empty Students List on Cloud
 
-- User doesn't have required role
-- Check `xs-security.json` for role requirements
+This is normal - cloud database starts empty. Create students using the "Create Student" request.
 
-### Connection Refused (Local)
+---
 
-- Ensure app is running: `mvn spring-boot:run`
-- Check port 8080 is not in use
+## Tips
 
-## Health Checks
-
-The health endpoints are accessible without authentication (required for BTP health monitoring):
-
-```bash
-# Basic health check (no auth required)
-curl http://localhost:8080/actuator/health
-
-# Returns: {"status":"UP"}
-```
-
-| Endpoint | Auth Required | Description |
-|----------|---------------|-------------|
-| `/actuator/health` | ❌ No | Basic health status |
-| `/actuator/health/liveness` | ❌ No | Kubernetes liveness probe |
-| `/actuator/health/readiness` | ❌ No | Kubernetes readiness probe |
-| `/actuator/info` | ❌ No | Application info |
+1. **Auto-save IDs:** Creating or fetching students auto-saves the ID to `studentId` variable
+2. **Token auto-save:** OAuth token is auto-saved to `accessToken` after successful auth
+3. **Check Console:** Postman console (View → Show Console) shows variable updates
+4. **Re-import:** If collection breaks, delete and re-import from these files

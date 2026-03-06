@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "student-manager-collection",
     "name": "Student Manager API",
-    "description": "CAP Java Student Manager OData V4 API collection.\n\nThis collection includes CRUD operations for the Students entity and various OData query examples.\n\n## Authentication\n- **Local**: Basic Auth with mock users (admin/admin or user/user)\n- **Cloud**: OAuth2 via XSUAA (configure in environment)",
+    "description": "CAP Java Student Manager OData V4 API collection.\n\nThis collection includes CRUD operations for the Students entity and various OData query examples.\n\n## Authentication\n- **Local**: Basic Auth with mock users (admin/admin or user/user)\n- **Cloud**: OAuth2 via XSUAA - First run 'Get OAuth2 Token' request, then use Bearer token\n\n## Setup for Cloud:\n1. Select 'Cloud' environment\n2. Run 'Get OAuth2 Token (Client Credentials)' request first\n3. Token is auto-saved to accessToken variable\n4. All other requests will use this token",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,21 +13,147 @@
     }
   ],
   "auth": {
-    "type": "basic",
-    "basic": [
+    "type": "bearer",
+    "bearer": [
       {
-        "key": "username",
-        "value": "{{username}}",
-        "type": "string"
-      },
-      {
-        "key": "password",
-        "value": "{{password}}",
+        "key": "token",
+        "value": "{{accessToken}}",
         "type": "string"
       }
     ]
   },
   "item": [
+    {
+      "name": "Authentication (Cloud)",
+      "item": [
+        {
+          "name": "Get OAuth2 Token (Client Credentials)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('accessToken', jsonData.access_token);",
+                  "    console.log('Token obtained and saved to environment');",
+                  "    console.log('Token expires in: ' + jsonData.expires_in + ' seconds');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{xsuaaUrl}}/oauth/token",
+              "host": ["{{xsuaaUrl}}"],
+              "path": ["oauth", "token"]
+            },
+            "description": "Get OAuth2 access token using client credentials flow.\n\n**For Cloud environment only.**\n\nThe token is automatically saved to the `accessToken` environment variable.\n\n**Run this request FIRST before any other API requests.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Get OAuth2 Token (Password Grant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('accessToken', jsonData.access_token);",
+                  "    console.log('Token obtained and saved to environment');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "{{username}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{password}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{xsuaaUrl}}/oauth/token",
+              "host": ["{{xsuaaUrl}}"],
+              "path": ["oauth", "token"]
+            },
+            "description": "Get OAuth2 access token using password grant flow (user credentials).\n\n**For Cloud environment only.**\n\nRequires username and password to be set in environment."
+          },
+          "response": []
+        }
+      ],
+      "description": "OAuth2 authentication endpoints for SAP BTP Cloud Foundry.\n\n**Run 'Get OAuth2 Token (Client Credentials)' FIRST before any other requests!**"
+    },
     {
       "name": "Service Metadata",
       "item": [
@@ -67,6 +193,23 @@
       "item": [
         {
           "name": "Get All Students",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.value && jsonData.value.length > 0) {",
+                  "        pm.environment.set('studentId', jsonData.value[0].ID);",
+                  "        console.log('First student ID saved: ' + jsonData.value[0].ID);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -75,7 +218,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["odata", "v4", "StudentService", "Students"]
             },
-            "description": "Retrieve all students from the database."
+            "description": "Retrieve all students from the database.\n\n**Note:** First student ID is auto-saved to studentId variable for use in other requests."
           },
           "response": []
         },
@@ -89,12 +232,27 @@
               "host": ["{{baseUrl}}"],
               "path": ["odata", "v4", "StudentService", "Students({{studentId}})"]
             },
-            "description": "Retrieve a single student by their UUID.\n\nExample IDs from seed data:\n- 11111111-1111-1111-1111-111111111111 (Alice)\n- 22222222-2222-2222-2222-222222222222 (Bob)\n- 33333333-3333-3333-3333-333333333333 (Carol)"
+            "description": "Retrieve a single student by their UUID."
           },
           "response": []
         },
         {
           "name": "Create Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('studentId', jsonData.ID);",
+                  "    console.log('Created student ID saved: ' + jsonData.ID);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -112,7 +270,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["odata", "v4", "StudentService", "Students"]
             },
-            "description": "Create a new student. The ID will be auto-generated (UUID).\n\n**Required fields:** firstName, lastName, email\n**Optional fields:** dateOfBirth, status (defaults to 'ACTIVE')\n\n**Validation:** Email must contain '@' character."
+            "description": "Create a new student. The ID will be auto-generated (UUID).\n\n**Required fields:** firstName, lastName, email\n**Optional fields:** dateOfBirth, status (defaults to 'ACTIVE')\n\n**Validation:** Email must contain '@' character.\n\n**Note:** Created student ID is auto-saved to studentId variable."
           },
           "response": []
         },
@@ -135,7 +293,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["odata", "v4", "StudentService", "Students({{studentId}})"]
             },
-            "description": "Partially update a student. Only the provided fields will be updated.\n\nCommon use case: Update student status to 'INACTIVE'."
+            "description": "Partially update a student. Only the provided fields will be updated."
           },
           "response": []
         },
@@ -398,136 +556,6 @@
         }
       ],
       "description": "OData V4 query options examples: $filter, $select, $orderby, $top, $skip, $count."
-    },
-    {
-      "name": "Authentication (Cloud)",
-      "item": [
-        {
-          "name": "Get OAuth2 Token (Client Credentials)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.environment.set('accessToken', jsonData.access_token);",
-                  "    console.log('Token obtained and saved to environment');",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "auth": {
-              "type": "noauth"
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded"
-              }
-            ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                {
-                  "key": "grant_type",
-                  "value": "client_credentials",
-                  "type": "text"
-                },
-                {
-                  "key": "client_id",
-                  "value": "{{clientId}}",
-                  "type": "text"
-                },
-                {
-                  "key": "client_secret",
-                  "value": "{{clientSecret}}",
-                  "type": "text"
-                }
-              ]
-            },
-            "url": {
-              "raw": "{{xsuaaUrl}}/oauth/token",
-              "host": ["{{xsuaaUrl}}"],
-              "path": ["oauth", "token"]
-            },
-            "description": "Get OAuth2 access token using client credentials flow.\n\n**For Cloud environment only.**\n\nThe token is automatically saved to the `accessToken` environment variable.\n\n**Setup:**\n1. Get XSUAA credentials from `cf env student-manager-srv`\n2. Set `xsuaaUrl`, `clientId`, `clientSecret` in Cloud environment"
-          },
-          "response": []
-        },
-        {
-          "name": "Get OAuth2 Token (Password Grant)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.environment.set('accessToken', jsonData.access_token);",
-                  "    console.log('Token obtained and saved to environment');",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "auth": {
-              "type": "noauth"
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded"
-              }
-            ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                {
-                  "key": "grant_type",
-                  "value": "password",
-                  "type": "text"
-                },
-                {
-                  "key": "client_id",
-                  "value": "{{clientId}}",
-                  "type": "text"
-                },
-                {
-                  "key": "client_secret",
-                  "value": "{{clientSecret}}",
-                  "type": "text"
-                },
-                {
-                  "key": "username",
-                  "value": "{{username}}",
-                  "type": "text"
-                },
-                {
-                  "key": "password",
-                  "value": "{{password}}",
-                  "type": "text"
-                }
-              ]
-            },
-            "url": {
-              "raw": "{{xsuaaUrl}}/oauth/token",
-              "host": ["{{xsuaaUrl}}"],
-              "path": ["oauth", "token"]
-            },
-            "description": "Get OAuth2 access token using password grant flow (user credentials).\n\n**For Cloud environment only.**\n\nThe token is automatically saved to the `accessToken` environment variable.\n\n**Setup:**\n1. Set `username` and `password` with your SAP BTP user credentials\n2. Note: Password grant may not be enabled for all XSUAA configurations"
-          },
-          "response": []
-        }
-      ],
-      "description": "OAuth2 authentication endpoints for SAP BTP Cloud Foundry.\n\n**Usage:**\n1. Select 'Cloud (BTP)' environment\n2. Configure XSUAA credentials from `cf env student-manager-srv`\n3. Run 'Get OAuth2 Token' request\n4. Token is auto-saved to `accessToken` variable\n5. Other requests will use the token via Bearer auth\n\n**Not needed for Local environment** (uses Basic Auth)."
     },
     {
       "name": "Health Check",
