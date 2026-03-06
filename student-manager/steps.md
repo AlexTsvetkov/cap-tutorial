@@ -111,10 +111,30 @@ Create `srv/service.cds`:
 ```cds
 using { tutorial } from '../db/schema';
 
-service StudentService {
+/**
+ * Student Management Service — exposes Students as an OData V4 endpoint.
+ * 
+ * By default, CAP provides full CRUD (Create, Read, Update, Delete)
+ * for every entity exposed in the service.
+ */
+service StudentService @(requires: 'authenticated-user') {
+
     entity Students as projection on tutorial.Students;
+
 }
 ```
+
+### Understanding `@(requires: 'authenticated-user')`
+
+This CDS annotation adds **service-level authorization**:
+- All endpoints under `StudentService` require an authenticated user
+- Works with both CAP Mock Authentication (local) and XSUAA (cloud)
+- The role `authenticated-user` is a built-in CAP role assigned to any logged-in user
+
+| Without Annotation | With `@(requires: 'authenticated-user')` |
+|-------------------|-------------------------------------------|
+| Anyone can access | Must be logged in |
+| No token validation | Token/credentials validated |
 
 ---
 
@@ -155,7 +175,7 @@ mvn clean compile
 
 ---
 
-## Step 7 - Java Handler (Optional Email Validation)
+## Step 7 - Java Handler (Email Validation)
 
 Create `srv/src/main/java/com/tutorial/studentmanager/handlers/StudentServiceHandler.java`:
 
@@ -164,42 +184,132 @@ package com.tutorial.studentmanager.handlers;
 
 import cds.gen.studentservice.Students;
 import cds.gen.studentservice.Students_;
+import com.sap.cds.services.ErrorStatuses;
+import com.sap.cds.services.ServiceException;
 import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.Before;
 import com.sap.cds.services.handler.annotations.ServiceName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 @ServiceName("StudentService")
 public class StudentServiceHandler implements EventHandler {
 
-    @Before(event = {CqnService.EVENT_CREATE, CqnService.EVENT_UPDATE}, entity = Students_.CDS_NAME)
-    public void validateEmail(Students student) {
-        String email = student.getEmail();
-        if (email != null && !email.contains("@")) {
-            throw new com.sap.cds.services.ServiceException(
-                    com.sap.cds.services.ErrorStatuses.BAD_REQUEST,
-                    "Invalid email format: " + email + ". Email must contain '@' character."
-            );
+    private static final Logger log = LoggerFactory.getLogger(StudentServiceHandler.class);
+
+    /**
+     * Validation: runs BEFORE every CREATE operation on Students.
+     * Ensures email contains '@' character.
+     * Returns HTTP 400 Bad Request if validation fails.
+     */
+    @Before(event = CqnService.EVENT_CREATE, entity = Students_.CDS_NAME)
+    public void validateStudentEmail(List<Students> students) {
+        for (Students student : students) {
+            String email = student.getEmail();
+            if (email != null && !email.contains("@")) {
+                throw new ServiceException(ErrorStatuses.BAD_REQUEST, "Invalid email format: " + email + ". Email must contain '@' character.");
+            }
+            log.info("Creating student: {} {}", student.getFirstName(), student.getLastName());
         }
     }
 }
 ```
 
+### Handler Code Explained
+
+| Element | Purpose |
+|---------|---------|
+| `@ServiceName("StudentService")` | Links this handler to the `StudentService` defined in `service.cds` |
+| `@Before(event = CqnService.EVENT_CREATE, ...)` | Runs **before** the CREATE operation is persisted |
+| `entity = Students_.CDS_NAME` | Uses generated constant for compile-time safety (value: `"StudentService.Students"`) |
+| `List<Students> students` | CAP passes a list — handles both single and batch creates |
+| `ServiceException` with `ErrorStatuses.BAD_REQUEST` | Returns HTTP 400 to the client |
+| `Logger` (SLF4J) | Structured logging for debugging |
+
+### Why `List<Students>` Instead of Single Entity?
+
+OData supports **batch operations** — a single POST request can create multiple entities. CAP always passes a list to handlers, even for single-entity creates. Iterating over the list ensures your validation works for both cases.
+
 ---
 
-## Step 8 - Sample Data (Local Development Only)
+## Step 8 - H2 Database Schema (Local Development Only)
+
+For local development with H2, we need to create the database schema manually. CAP auto-generates this for HANA, but for H2 we provide an explicit schema file.
+
+Create `srv/src/main/resources/schema-h2.sql`:
+
+```sql
+DROP VIEW IF EXISTS StudentService_Students;
+DROP TABLE IF EXISTS tutorial_Students;
+
+CREATE TABLE tutorial_Students (
+  ID NVARCHAR(36) NOT NULL,
+  createdAt TIMESTAMP(7),
+  createdBy NVARCHAR(255),
+  modifiedAt TIMESTAMP(7),
+  modifiedBy NVARCHAR(255),
+  firstName NVARCHAR(100),
+  lastName NVARCHAR(100),
+  email NVARCHAR(255),
+  dateOfBirth DATE,
+  status NVARCHAR(20) DEFAULT 'ACTIVE',
+  PRIMARY KEY(ID)
+);
+
+
+CREATE VIEW StudentService_Students AS SELECT
+  Students_0.ID,
+  Students_0.createdAt,
+  Students_0.createdBy,
+  Students_0.modifiedAt,
+  Students_0.modifiedBy,
+  Students_0.firstName,
+  Students_0.lastName,
+  Students_0.email,
+  Students_0.dateOfBirth,
+  Students_0.status
+FROM tutorial_Students AS Students_0;
+```
+
+### Schema File Explained
+
+| Element | Purpose |
+|---------|---------|
+| `DROP VIEW/TABLE IF EXISTS` | Clean slate on restart (H2 is in-memory) |
+| `tutorial_Students` table | Matches CDS entity with `namespace.EntityName` naming |
+| `NVARCHAR` types | Compatible with HANA's string handling |
+| `TIMESTAMP(7)` | High precision for `managed` aspect timestamps |
+| `StudentService_Students` view | CAP uses views for service projections |
+
+### Why Do We Need This?
+
+- **H2 vs HANA**: H2 doesn't understand CDS models directly
+- **CAP auto-config**: In cloud, HDI deployer creates tables from `.hdbtable` files
+- **Local workaround**: We provide equivalent DDL for H2
+
+---
+
+## Step 8.1 - Sample Data (Local Development Only)
 
 Create `srv/src/main/resources/data.sql`:
 
 ```sql
-INSERT INTO tutorial_Students (ID, firstName, lastName, email, dateOfBirth, status)
-VALUES 
+-- =============================================
+-- Initial test data for Student Manager
+-- =============================================
+
+INSERT INTO tutorial_Students (ID, firstName, lastName, email, dateOfBirth, status) VALUES
     ('11111111-1111-1111-1111-111111111111', 'Alice', 'Johnson', 'alice@example.com', '2000-05-14', 'ACTIVE'),
     ('22222222-2222-2222-2222-222222222222', 'Bob', 'Smith', 'bob@example.com', '1999-11-30', 'ACTIVE'),
     ('33333333-3333-3333-3333-333333333333', 'Carol', 'Williams', 'carol@example.com', '2001-02-20', 'INACTIVE');
 ```
+
+**Note**: This data is only loaded locally. In cloud, you'll insert data via the OData API.
 
 ---
 
@@ -679,43 +789,62 @@ Update `package.json` with CDS production configuration:
 
 ### XSUAA Security (`xs-security.json`):
 
+This file defines OAuth2 scopes, role templates, and role collections for your application.
+
 ```json
 {
-  "xsappname": "student-manager",
-  "tenant-mode": "dedicated",
-  "scopes": [
-    { "name": "$XSAPPNAME.Read", "description": "Read access" },
-    { "name": "$XSAPPNAME.Write", "description": "Write access" }
-  ],
-  "role-templates": [
-    {
-      "name": "Viewer",
-      "description": "Read-only access",
-      "scope-references": ["$XSAPPNAME.Read"]
-    },
-    {
-      "name": "Editor",
-      "description": "Full access",
-      "scope-references": ["$XSAPPNAME.Read", "$XSAPPNAME.Write"]
+    "xsappname": "student-manager",
+    "tenant-mode": "dedicated",
+    "description": "Student Manager OAuth2 Security",
+    "scopes": [
+        {
+            "name": "$XSAPPNAME.user",
+            "description": "Regular user access"
+        },
+        {
+            "name": "$XSAPPNAME.admin",
+            "description": "Administrator access"
+        }
+    ],
+    "role-templates": [
+        {
+            "name": "User",
+            "description": "Standard user",
+            "scope-references": ["$XSAPPNAME.user"]
+        },
+        {
+            "name": "Admin",
+            "description": "Administrator",
+            "scope-references": ["$XSAPPNAME.user", "$XSAPPNAME.admin"]
+        }
+    ],
+    "role-collections": [
+        {
+            "name": "StudentManager_User",
+            "description": "Student Manager Users",
+            "role-template-references": ["$XSAPPNAME.User"]
+        },
+        {
+            "name": "StudentManager_Admin",
+            "description": "Student Manager Admins",
+            "role-template-references": ["$XSAPPNAME.Admin"]
+        }
+    ],
+    "oauth2-configuration": {
+        "redirect-uris": ["https://*.cfapps.us10-001.hana.ondemand.com/**"],
+        "token-validity": 900
     }
-  ],
-  "role-collections": [
-    {
-      "name": "StudentManager_Viewer",
-      "description": "View students",
-      "role-template-references": ["$XSAPPNAME.Viewer"]
-    },
-    {
-      "name": "StudentManager_Editor",
-      "description": "Manage students",
-      "role-template-references": ["$XSAPPNAME.Editor"]
-    }
-  ],
-  "oauth2-configuration": {
-    "redirect-uris": ["https://*.cfapps.*.hana.ondemand.com/**"]
-  }
 }
 ```
+
+| Element | Purpose |
+|---------|---------|
+| `xsappname` | Unique identifier for your app in XSUAA |
+| `tenant-mode: dedicated` | Single-tenant application (not multi-tenant SaaS) |
+| `scopes` | Fine-grained permissions (`user`, `admin`) |
+| `role-templates` | Bundled scope assignments |
+| `role-collections` | Assignable to users in BTP Cockpit |
+| `token-validity` | JWT token lifetime in seconds (900 = 15 min) |
 
 ### HDI Deployer (`db/package.json`):
 
@@ -725,6 +854,7 @@ Update `package.json` with CDS production configuration:
 {
     "name": "student-manager-db",
     "version": "1.0.0",
+    "description": "Database deployer for Student Manager",
     "dependencies": {
         "@sap/hdi-deploy": "^5",
         "hdb": "^0.19.0"
@@ -748,7 +878,6 @@ cd db && npm install && cd ..
 ```json
 {
     "name": "student-manager-approuter",
-    "version": "1.0.0",
     "dependencies": {
         "@sap/approuter": "^16"
     },
@@ -760,48 +889,59 @@ cd db && npm install && cd ..
 
 ### AppRouter Config (`approuter/xs-app.json`):
 
+The AppRouter handles authentication and routes requests to the backend service.
+
 ```json
 {
-    "welcomeFile": "/odata/v4/StudentService/",
+    "welcomeFile": "/odata/v4/StudentService/$metadata",
     "authenticationMethod": "route",
     "routes": [
         {
             "source": "^/odata/(.*)$",
             "target": "/odata/$1",
-            "destination": "srv-api",
+            "destination": "student-manager-srv",
             "authenticationType": "xsuaa"
+        },
+        {
+            "source": "^/actuator/(.*)$",
+            "target": "/actuator/$1",
+            "destination": "student-manager-srv",
+            "authenticationType": "none"
         }
     ]
 }
 ```
+
+| Route | Purpose |
+|-------|---------|
+| `/odata/**` | OData endpoints — requires XSUAA authentication |
+| `/actuator/**` | Health check endpoints — no authentication (for Cloud Foundry probes) |
 
 ### MTA Descriptor (`mta.yaml`):
 
 ⚠️ **IMPORTANT**: Must specify Java 21 runtime!
 
 ```yaml
-_schema-version: "3.1"
+_schema-version: "3.2"
 ID: student-manager
 version: 1.0.0
-description: Student Manager CAP Java Application
+description: Student Manager - CAP Java Application
 
 parameters:
   enable-parallel-deployments: true
 
-build-parameters:
-  before-all:
-    - builder: custom
-      commands:
-        - npm install --production
-
+# =============================================
+# MODULES — things that get deployed (apps)
+# =============================================
 modules:
-  # Java Service Module
+
+  # 1. Java Backend Service
   - name: student-manager-srv
     type: java
     path: srv
     parameters:
-      buildpack: sap_java_buildpack_jakarta
       memory: 1024M
+      buildpack: sap_java_buildpack_jakarta
     properties:
       SPRING_PROFILES_ACTIVE: cloud
       JBP_CONFIG_COMPONENTS: "jres: ['com.sap.xs.java.buildpack.jre.SAPMachineJRE']"
@@ -810,7 +950,7 @@ modules:
       builder: custom
       commands:
         - mvn clean package -DskipTests
-      build-result: target/*-exec.jar
+      build-result: target/*.jar
     provides:
       - name: srv-api
         properties:
@@ -821,54 +961,63 @@ modules:
       - name: student-manager-logging
       - name: student-manager-autoscaler
 
-  # Database Deployer
+  # 2. HANA DB Deployer (runs once to create tables)
   - name: student-manager-db-deployer
     type: hdb
     path: db
     parameters:
       buildpack: nodejs_buildpack
-      memory: 256M
     build-parameters:
       builder: custom
       commands:
-        - npm install --production
+        - npm install
     requires:
       - name: student-manager-db
 
-  # AppRouter
+  # 3. Application Router (entry point for users)
   - name: student-manager-approuter
     type: approuter.nodejs
     path: approuter
     parameters:
       memory: 256M
+    provides:
+      - name: approuter-url
+        properties:
+          url: ${default-url}
     requires:
       - name: student-manager-xsuaa
       - name: srv-api
         group: destinations
         properties:
-          name: srv-api
+          name: student-manager-srv
           url: ~{srv-url}
           forwardAuthToken: true
 
+# =============================================
+# RESOURCES — BTP services to create/bind
+# =============================================
 resources:
-  # HANA HDI Container
+
+  # HANA HDI Container (database)
+  # IMPORTANT: Requires SAP HANA Cloud instance to be created first in BTP Cockpit!
+  # For Trial: Go to BTP Cockpit -> Subaccount -> SAP HANA Cloud -> Create Instance
   - name: student-manager-db
     type: com.sap.xs.hdi-container
     parameters:
       service: hana
       service-plan: hdi-shared
-      service-keys:
-        - name: student-manager-db-key
+      config:
+        # Use default HANA Cloud instance in the space
+        # If you have multiple instances, specify: database_id: <your-hana-db-id>
+        schema: STUDENT_MANAGER
 
-  # XSUAA Service
+  # XSUAA (OAuth2 authentication)
   - name: student-manager-xsuaa
     type: org.cloudfoundry.managed-service
     parameters:
       service: xsuaa
       service-plan: application
-      path: ./xs-security.json
-      service-keys:
-        - name: student-manager-xsuaa-key
+      path: xs-security.json
 
   # Application Logging
   - name: student-manager-logging
@@ -884,6 +1033,16 @@ resources:
       service: autoscaler
       service-plan: standard
 ```
+
+### MTA Key Differences from Generic Template
+
+| Aspect | This Project | Generic Template |
+|--------|--------------|------------------|
+| `_schema-version` | `3.2` | Often `3.1` |
+| `build-result` | `target/*.jar` | `target/*-exec.jar` |
+| HDI container | Has `config.schema` | Often has `service-keys` |
+| AppRouter destination | `student-manager-srv` | Often `srv-api` |
+| Actuator route | Explicit with `authenticationType: none` | Often missing |
 
 ---
 
