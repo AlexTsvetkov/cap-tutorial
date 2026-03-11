@@ -16,12 +16,12 @@
 5. [Define the Students Entity (CDS Model)](#step-5--define-the-students-entity-cds-model)
 6. [Create the Students Service with CRUD](#step-6--create-the-students-service-with-crud)
 7. [Add Initial Data](#step-7--add-initial-data)
-8. [Configure application.yaml](#step-8--configure-applicationyaml)
+8. [Configure application.yaml (Local Development)](#step-8--configure-applicationyaml-local-development)
 9. [Build the App & Explore Generated Files](#step-9--build-the-app--explore-generated-files)
 10. [Run Locally & Test with Postman](#step-10--run-locally--test-with-postman)
 11. [Add BTP Services (HANA, XSUAA, Logging, Autoscaler)](#step-11--add-btp-services-hana-xsuaa-logging-autoscaler)
 12. [Create & Explain mta.yaml](#step-12--create--explain-mtayaml)
-13. [Configure Security (OAuth2 for Cloud, Basic for Local)](#step-13--configure-security-oauth2-for-cloud-basic-for-local)
+13. [Configure Cloud Profile & Security](#step-13--configure-cloud-profile--security)
 14. [Create HANA Cloud Instance (Required!)](#step-14--create-hana-cloud-instance-required)
 15. [Build & Deploy to SAP BTP Trial](#step-15--build--deploy-to-sap-btp-trial)
 16. [Explain Deployment & Runtime on BTP](#step-16--explain-deployment--runtime-on-btp)
@@ -540,11 +540,11 @@ EOF
 
 ---
 
-## Step 8 — Configure application.yaml
+## Step 8 — Configure application.yaml (Local Development)
 
 ### 🎤 What to say
 
-> "The `application.yaml` is where we configure Spring Boot + CAP behavior. CAP Java uses Spring profiles to differentiate between local development and cloud deployment."
+> "The `application.yaml` is where we configure Spring Boot + CAP behavior. For now, we'll set up the local development profile with H2 in-memory database. Later, when we prepare for cloud deployment, we'll add a cloud profile."
 
 ### Command: Create application.yaml
 
@@ -589,41 +589,16 @@ management:
   endpoint:
     health:
       show-details: always
-
-# =============================================
-# CLOUD profile — SAP BTP Cloud Foundry
-# =============================================
----
-spring:
-  config:
-    activate:
-      on-profile: cloud
-  sql:
-    init:
-      mode: never
-
-cds:
-  datasource:
-    auto-config:
-      enabled: true
-  security:
-    xsuaa:
-      enabled: true
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      probes:
-        enabled: true
-      show-details: always
 YAML
 ```
 
 **🔍 Explain section by section:**
+
+### Global settings
+| Setting | Purpose |
+|---------|---------|
+| `spring.application.name` | Names our Spring Boot application |
+| `spring.profiles.active: default` | Activates the `default` profile — used for local development |
 
 ### Local profile (`default`)
 | Setting | Purpose |
@@ -631,14 +606,10 @@ YAML
 | `spring.datasource.url` | H2 in-memory database — data is lost on restart |
 | `spring.sql.init.mode: always` | Runs `data.sql` every startup to seed test data |
 | `h2.console.enabled: true` | H2 web console at `/h2-console` for debugging |
+| `cds.odata-v4.endpoint.path` | Sets the OData V4 endpoint base path |
+| `management.endpoints` | Exposes health and info actuator endpoints |
 
-### Cloud profile
-| Setting | Purpose |
-|---------|---------|
-| `on-profile: cloud` | Activated when `SPRING_PROFILES_ACTIVE=cloud` is set (in mta.yaml) |
-| `sql.init.mode: never` | Don't run SQL init scripts in cloud (HANA has its own data) |
-| `cds.datasource.auto-config` | CAP automatically reads `VCAP_SERVICES` to connect to HANA |
-| `cds.security.xsuaa.enabled` | Uses **real OAuth2 JWT tokens** from XSUAA service |
+> 💡 **Note:** We'll add a `cloud` profile in Step 13 when we configure security and cloud-specific settings.
 
 ---
 
@@ -1102,13 +1073,67 @@ EOF
 
 ---
 
-## Step 13 — Configure Security (OAuth2 for Cloud, Basic for Local)
+## Step 13 — Configure Cloud Profile & Security
 
 ### 🎤 What to say
 
-> "CAP has a dual security model: mock authentication for local development (so you don't need a real OAuth2 server), and XSUAA-based OAuth2 JWT validation in the cloud."
+> "Now that we have the MTA descriptor and BTP services configured, we need to do two things: add a `cloud` profile to our `application.yaml` for HANA and XSUAA settings, and create a Spring Security configuration that handles both local and cloud authentication."
 
-### Create Spring Security Configuration
+### Step 13.1: Add Cloud Profile to application.yaml
+
+> "Remember in Step 8, we only configured the `default` (local) profile. Now we need to add a `cloud` profile that tells CAP how to connect to HANA and use XSUAA for authentication when running on SAP BTP."
+
+Append the cloud profile to the existing `application.yaml`:
+
+```bash
+cat >> srv/src/main/resources/application.yaml << 'YAML'
+
+# =============================================
+# CLOUD profile — SAP BTP Cloud Foundry
+# =============================================
+---
+spring:
+  config:
+    activate:
+      on-profile: cloud
+  sql:
+    init:
+      mode: never
+
+cds:
+  datasource:
+    auto-config:
+      enabled: true
+  security:
+    xsuaa:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+YAML
+```
+
+**🔍 Explain the cloud profile:**
+
+| Setting | Purpose |
+|---------|---------|
+| `on-profile: cloud` | Activated when `SPRING_PROFILES_ACTIVE=cloud` is set (configured in `mta.yaml`) |
+| `sql.init.mode: never` | Don't run SQL init scripts in cloud — HANA has its own data managed by the HDI deployer |
+| `cds.datasource.auto-config` | CAP automatically reads `VCAP_SERVICES` environment variable to connect to the HANA HDI container |
+| `cds.security.xsuaa.enabled` | Enables **real OAuth2 JWT token validation** using the XSUAA service instance |
+| `health.probes.enabled` | Enables Kubernetes-style liveness/readiness probes used by Cloud Foundry |
+
+> 💡 **How Spring profiles work:** When deployed to BTP, the `mta.yaml` sets `SPRING_PROFILES_ACTIVE=cloud` as an environment variable. Spring Boot then loads the `cloud` profile settings **on top of** the global settings, overriding any conflicting values from the `default` profile.
+
+### Step 13.2: Create Spring Security Configuration
 
 ```bash
 mkdir -p srv/src/main/java/com/tutorial/studentmanager/config
